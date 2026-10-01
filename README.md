@@ -15,7 +15,7 @@ python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The interactive map uses online OpenStreetMap tiles; its optional satellite basemap uses Esri World Imagery. Internet access is needed for those map tiles and Leaflet assets.
+Open (https://shivnandan225.github.io/github-copilot-seminar/). The interactive map uses online OpenStreetMap tiles; its optional satellite basemap uses Esri World Imagery. Internet access is needed for those map tiles and Leaflet assets.
 
 Set `GREEN_GUARD_DB` to a file path to keep the SQLite database somewhere other than `data/greenguard.db`.
 
