@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1713">
+  <meta name="description" content="GreenGuard AI forest monitoring prototype — demo data unless verified live providers are configured.">
+  <title>GreenGuard AI — Forest Guardian</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" aria-label="GreenGuard AI home">
+        <span class="brand-mark" aria-hidden="true">✳</span>
+        <span><strong>GreenGuard</strong><small>FOREST GUARDIAN</small></span>
+      </a>
+      <div class="nav-label">MONITORING</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a class="nav-link active" href="#overview"><span>⌂</span>Overview</a>
+        <a class="nav-link" href="#map-panel"><span>◎</span>Forest map</a>
+        <a class="nav-link" href="#satellite"><span>◉</span>Satellite watch</a>
+        <a class="nav-link" href="#ground"><span>⌕</span>Ground cameras</a>
+        <a class="nav-link" href="#acoustic"><span>〰</span>Acoustic sensors</a>
+        <a class="nav-link" href="#events"><span>⌁</span>Event center <b class="nav-count" id="nav-count">0</b></a>
+        <a class="nav-link" href="#reports"><span>▤</span>Reports</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-note">
+          <span class="pulse-dot"></span>
+          <div><strong>Demo environment</strong><small>No live feeds connected</small></div>
+        </div>
+        <button class="nav-link theme-toggle" id="theme-toggle" type="button"><span>◐</span>Switch appearance</button>
+        <a class="nav-link" href="#settings"><span>⚙</span>Settings</a>
+        <div class="sidebar-footer">GREEN GUARD AI <span>v0.1 PROTOTYPE</span></div>
+      </div>
+    </aside>
+
+    <main class="main-content" id="overview">
+      <header class="topbar">
+        <button class="mobile-menu icon-button" id="mobile-menu" aria-label="Toggle navigation">☰</button>
+        <div class="breadcrumb">Forest intelligence <span>/</span> <strong>Overview</strong></div>
+        <div class="top-actions">
+          <span class="mode-chip"><i></i> DEMO DATA MODE</span>
+          <button class="icon-button notification-button" aria-label="No new notifications">♧</button>
+          <div class="avatar" aria-label="Local demo workspace">GG</div>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <section class="welcome-row">
+          <div>
+            <div class="eyebrow"><span class="pulse-dot"></span> FOREST GUARDIAN · PROTOTYPE</div>
+            <h1>Eyes in the Sky.<br><em>Eyes on the Ground.</em></h1>
+            <p class="welcome-copy">A clearer picture of the forest, bringing observations together for people to review.</p>
+          </div>
+          <div class="date-card">
+            <span class="date-icon">◷</span><div><small>WORKSPACE TIME</small><strong id="clock">—</strong></div>
+          </div>
+        </section>
+
+        <div class="demo-banner" role="note">
+          <span class="banner-icon">i</span>
+          <div><strong>DEMO DATA MODE</strong><span>Illustrative region, devices, and events only. No verified forest observations or live monitoring feeds are configured.</span></div>
+          <button class="banner-close" id="banner-close" aria-label="Dismiss notice">×</button>
+        </div>
+
+        <section class="surface demo-console" aria-labelledby="demo-title">
+          <div class="demo-console-copy">
+            <div class="section-kicker"><span class="console-spark">✳</span> INTERACTIVE SEMINAR WALKTHROUGH</div>
+            <h2 id="demo-title">See a forest alert go from signal to human review.</h2>
+            <p>Synthetic camera, acoustic, and satellite-review scenarios animate the map and queue. <strong>No live forest data or sensor signals are used.</strong></p>
+            <div class="demo-steps" aria-label="Demonstration workflow">
+              <span><i>01</i> Simulated signal</span><b>→</b><span><i>02</i> Map &amp; correlate</span><b>→</b><span><i>03</i> Human decides</span>
+            </div>
+          </div>
+          <div class="demo-console-controls">
+            <label for="demo-zone">DEMO REGION</label>
+            <select id="demo-zone" aria-label="Choose demo monitoring zone"></select>
+            <label for="demo-starting-scenario">FIRST SCENARIO</label>
+            <select id="demo-starting-scenario" aria-label="Choose first simulated scenario">
+              <option value="Camera">Camera motion</option>
+              <option value="Acoustic">Acoustic anomaly</option>
+              <option value="Satellite">Satellite change review</option>
+            </select>
+            <div class="demo-console-buttons">
+              <button class="button button-primary" id="start-demo-button" type="button"><span>▶</span> Run 60-sec demo</button>
+              <button class="button button-secondary" id="trigger-demo-button" type="button">＋ Sample alert</button>
+            </div>
+            <div class="demo-run-status" id="demo-run-status" aria-live="polite"><i class="demo-status-dot"></i><span>READY · Not connected to real sensors</span></div>
+          </div>
+          <div class="demo-signal" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </section>
+
+        <section class="surface weather-strip" aria-labelledby="weather-title">
+          <div class="weather-heading"><span class="weather-symbol" id="weather-symbol" aria-hidden="true">◉</span><div><div class="section-kicker">LIVE REGIONAL CONTEXT · OPEN-METEO</div><h2 id="weather-title">Weather near the illustrative demo pin</h2></div></div>
+          <div class="weather-values" id="weather-values" aria-live="polite">
+            <div><strong id="weather-temperature">—</strong><span>Temperature</span></div>
+            <div><strong id="weather-humidity">—</strong><span>Humidity</span></div>
+            <div><strong id="weather-wind">—</strong><span>Wind</span></div>
+            <div><strong id="weather-rain">—</strong><span>Precipitation</span></div>
+          </div>
+          <div class="weather-foot"><span id="weather-status">Fetching current regional model conditions…</span><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Weather data by Open-Meteo ↗</a></div>
+          <p class="weather-caveat">Regional weather-model data only — not a forest-site sensor, satellite observation, or activity detection.</p>
+        </section>
+
+        <section class="metric-grid" aria-label="Forest monitoring overview">
+          <article class="metric-card">
+            <div class="metric-head"><span>MONITORING ZONES</span><span class="metric-icon green">◎</span></div>
+            <div class="metric-value" id="zone-count">—</div><div class="metric-foot">Configured areas <span class="plain-status">· demo included</span></div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-head"><span>GROUND CAMERAS</span><span class="metric-icon blue">⌕</span></div>
+            <div class="metric-value" id="camera-count">—</div><div class="metric-foot">Inventory only <span class="plain-status">· no live feed</span></div>
+          </article>
+          <article class="metric-card">
+            <div class="metric-head"><span>ACOUSTIC SENSORS</span><span class="metric-icon amber">〰</span></div>
+            <div class="metric-value" id="sensor-count">—</div><div class="metric-foot">Inventory only <span class="plain-status">· no audio feed</span></div>
+          </article>
+          <article class="metric-card metric-highlight">
+            <div class="metric-head"><span>HUMAN REVIEW QUEUE</span><span class="metric-icon coral">⌁</span></div>
+            <div class="metric-value" id="review-count">—</div><div class="metric-foot">Demo workflow examples <a href="#events">Review events <b>→</b></a></div>
+          </article>
+        </section>
+
+        <section class="map-card surface" id="map-panel">
+          <div class="section-heading map-heading">
+            <div><div class="section-kicker">GEOSPATIAL MONITORING</div><h2>Forest map <span class="live-label"><i></i> DEMO REGION</span></h2>
+              <p class="subtext">Select a point to inspect coordinates, or add a zone. Boundary shown is illustrative only.</p></div>
+            <div class="map-actions">
+              <div class="search-box"><span>⌕</span><input id="location-search" type="search" placeholder="Search a location" aria-label="Search a location"><button id="search-button">Search</button></div>
+              <button class="button button-secondary" id="add-point-button" type="button">＋ Point</button>
+              <button class="button button-primary" id="add-zone-button"><span>＋</span> Add zone</button>
+            </div>
+          </div>
+          <div class="map-wrap">
+            <div id="map" aria-label="Interactive forest monitoring map"></div>
+            <div class="map-legend"><strong>MAP KEY</strong><span><i class="legend-boundary"></i>Illustrative boundary</span><span><i class="legend-point"></i>Monitoring point</span><span><i class="legend-risk"></i>Demo workflow marker</span></div>
+            <div class="map-attribution-note">Map imagery is a basemap only · demo geometry is not a verified boundary</div>
+            <div class="map-selection" id="map-selection" hidden></div>
+          </div>
+          <div class="zone-strip" id="zone-list"></div>
+        </section>
+
+        <div class="content-grid">
+          <section class="surface module-card satellite-card" id="satellite">
+            <div class="section-heading compact-heading">
+              <div><div class="section-kicker">REMOTE SENSING</div><h2>Satellite watch</h2></div>
+              <span class="status-tag status-neutral">NOT CONNECTED</span>
+            </div>
+            <div class="satellite-preview">
+              <div class="satellite-globe" aria-hidden="true"><span>◎</span></div>
+              <div><span class="preview-label">OBSERVATION PROVIDER</span><strong>Not configured</strong><p>Basemap imagery is not a satellite observation.</p></div>
+            </div>
+            <div class="comparison">
+              <div class="comparison-head"><strong>Before <span>vs</span> After</strong><span>CHANGE DETECTION</span></div>
+              <div class="comparison-boxes">
+                <div><span>PREVIOUS OBSERVATION</span><strong>—</strong><small>No verified data</small></div>
+                <div><span>LATEST OBSERVATION</span><strong>—</strong><small>No verified data</small></div>
+              </div>
+            </div>
+            <div class="satellite-foot"><span>◌</span> Vegetation, affected area, change % and observation date unavailable</div>
+            <p class="fine-print">Automated change detection can produce false positives and requires verification.</p>
+          </section>
+
+          <section class="surface module-card risk-card">
+            <div class="section-heading compact-heading">
+              <div><div class="section-kicker">SPATIAL CONTEXT</div><h2>Risk overview</h2></div>
+              <span class="status-tag status-demo">ILLUSTRATIVE</span>
+            </div>
+            <div class="risk-visual">
+              <div class="risk-ring ring-one"></div><div class="risk-ring ring-two"></div>
+              <div class="risk-crosshair"></div><div class="risk-center"><span>DEMO</span><strong>—</strong><small>NO LIVE RISK SCORE</small></div>
+            </div>
+            <div class="risk-scale"><span>LOW</span><div><i></i><i></i><i></i><i></i><i></i></div><span>HIGH</span></div>
+            <p class="fine-print">No risk assessment is available. Colored map markers are synthetic workflow examples, not inferred risk.</p>
+          </section>
+        </div>
+
+        <section class="surface module-card" id="ground">
+          <div class="section-heading">
+            <div><div class="section-kicker">GROUND-LEVEL MONITORING</div><h2>Camera watch</h2><p class="subtext">Upload a sample or request camera access. No detection model is configured.</p></div>
+            <span class="status-tag status-neutral">MODEL NOT CONFIGURED</span>
+          </div>
+          <div class="camera-layout">
+            <div class="camera-preview" id="camera-preview">
+              <div class="camera-placeholder"><span class="camera-glyph">⌕</span><strong>Camera preview</strong><small>No live camera connected</small></div>
+              <video id="camera-video" autoplay playsinline muted hidden></video>
+              <img id="image-preview" alt="Selected upload preview" hidden>
+              <span class="preview-chip">PREVIEW ONLY</span>
+            </div>
+            <div class="camera-controls">
+              <div class="camera-device"><span class="device-icon">⌕</span><div><strong>Field camera inventory</strong><small id="camera-inventory">Loading configured devices…</small></div><span class="status-tag status-demo">DEMO</span></div>
+              <div class="upload-actions">
+                <label class="button button-secondary upload-button">Upload image / video<input id="media-upload" type="file" accept="image/*,video/*"></label>
+                <button class="button button-secondary" id="webcam-button">Start webcam</button>
+                <button class="button button-secondary" id="capture-frame-button" type="button" hidden>Inspect frame</button>
+              </div>
+              <div id="media-result" class="media-result" aria-live="polite">Images are checked for readability only. No objects or activity are identified.</div>
+              <p class="fine-print">Media is not saved. Any future AI-generated event must say: “Potential activity detected — human verification required.” AI cannot determine whether a person committed a crime.</p>
+            </div>
+          </div>
+        </section>
+
+        <div class="content-grid">
+          <section class="surface module-card" id="acoustic">
+            <div class="section-heading compact-heading"><div><div class="section-kicker">OPTIONAL AUDIO</div><h2>Acoustic monitoring</h2></div><span class="status-tag status-neutral">NO AUDIO FEED</span></div>
+            <div class="sensor-row"><span class="sensor-icon">〰</span><div><strong>Sensor inventory</strong><small id="sensor-inventory">Loading configured sensors…</small></div><span class="status-tag status-demo">DEMO</span></div>
+            <div class="empty-state"><span>◌</span><p>No acoustic streams or audio analysis are configured.</p></div>
+          </section>
+          <section class="surface module-card system-card" id="settings">
+            <div class="section-heading compact-heading"><div><div class="section-kicker">PLATFORM HEALTH</div><h2>System status</h2></div><span class="status-tag status-online"><i></i> ONLINE</span></div>
+            <div class="system-list">
+              <div><span>Application API</span><strong><i class="status-dot green-dot"></i>Connected</strong></div>
+              <div><span>Database</span><strong id="db-status">SQLite</strong></div>
+              <div><span>Satellite provider</span><strong class="text-muted">Not configured</strong></div>
+              <div><span>Detection model</span><strong class="text-muted">Not configured</strong></div>
+              <div><span>Data environment</span><strong class="text-amber">Demo data</strong></div>
+            </div>
+          </section>
+        </div>
+
+        <section class="surface module-card event-section" id="events">
+          <div class="section-heading event-heading">
+            <div><div class="section-kicker">HUMAN VERIFICATION CENTER</div><h2>Event timeline <span class="status-tag status-demo">DEMO EXAMPLES</span></h2><p class="subtext">Events are not findings. Review, verify, or dismiss each workflow example.</p></div>
+            <div class="event-filters"><select id="event-filter" aria-label="Filter events"><option value="all">All events</option><option value="Pending review">Pending review</option><option value="Verified">Verified</option><option value="Dismissed">Dismissed</option></select></div>
+          </div>
+          <div class="event-list" id="event-list"><div class="loading-state">Loading review queue…</div></div>
+        </section>
+
+        <section class="surface module-card report-section" id="reports">
+          <div class="report-copy"><div class="section-kicker">EXPORT & SHARE</div><h2>Reports</h2><p class="subtext">Export the current demo configuration and human-review queue as JSON. No real observations are included.</p></div>
+          <button class="button button-secondary" id="export-report">↓ Export demo report</button>
+        </section>
+        <footer class="page-footer"><span>GreenGuard AI · Forest Guardian</span><span>Environmental monitoring prototype · Human verification required</span></footer>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="zone-dialog" class="zone-dialog">
+    <form method="dialog" id="zone-form">
+      <div class="dialog-head"><div><div class="section-kicker">GEOFENCE SETUP</div><h2>Create monitoring zone</h2></div><button class="icon-button" id="close-dialog" aria-label="Close">×</button></div>
+      <p class="subtext">Click the map to set a center. New zones use a small illustrative boundary until a GeoJSON boundary is loaded.</p>
+      <label for="zone-name">Zone name</label><input id="zone-name" name="name" required minlength="2" maxlength="80" placeholder="e.g. North ridge">
+      <div class="coordinate-inputs"><div><label for="zone-lat">Latitude</label><input id="zone-lat" name="latitude" type="number" step="any" min="-90" max="90" required></div><div><label for="zone-lng">Longitude</label><input id="zone-lng" name="longitude" type="number" step="any" min="-180" max="180" required></div></div>
+      <label for="geojson-upload">Boundary GeoJSON (optional)</label><input id="geojson-upload" type="file" accept=".geojson,.json,application/geo+json,application/json">
+      <p class="fine-print">Polygon or MultiPolygon only. Without a file, a small illustrative boundary is created around the selected point.</p>
+      <p class="dialog-error" id="zone-error" aria-live="polite"></p>
+      <div class="dialog-actions"><button class="button button-secondary" type="button" id="cancel-zone">Cancel</button><button class="button button-primary" type="submit">Save demo zone</button></div>
+    </form>
+  </dialog>
+  <dialog id="point-dialog" class="zone-dialog">
+    <form method="dialog" id="point-form">
+      <div class="dialog-head"><div><div class="section-kicker">FIELD INVENTORY</div><h2>Add monitoring point</h2></div><button class="icon-button" id="close-point-dialog" aria-label="Close">×</button></div>
+      <p class="subtext">Yahan device ki location aur type save karein. Map par device ki asli jagah click karne se coordinates bhar jaate hain.</p>
+      <div class="point-howto"><strong>Kya bharein?</strong><span><b>1.</b> Map par camera/sensor ki jagah click karein (Latitude/Longitude auto-fill).</span><span><b>2.</b> Naam, device type aur monitoring zone select karein.</span><span><b>3.</b> Map click na kiya ho to asli GPS coordinates decimal degrees mein daalein.</span></div>
+      <label for="point-name">Device / point name</label><input id="point-name" name="name" required minlength="2" maxlength="80" placeholder="e.g. North ridge camera">
+      <label for="point-kind">Point type</label><select id="point-kind" name="kind"><option value="monitoring">Monitoring point (location only)</option><option value="camera">Camera placeholder (visual feed)</option><option value="acoustic">Acoustic sensor placeholder (audio feed)</option></select>
+      <p class="point-kind-help" id="point-kind-help" aria-live="polite">Location marker only; it does not collect or analyze data.</p>
+      <label for="point-zone">Monitoring zone</label><select id="point-zone" name="zone_id" required></select>
+      <div class="coordinate-inputs"><div><label for="point-lat">Latitude (−90 to 90)</label><input id="point-lat" name="latitude" type="number" step="any" min="-90" max="90" required placeholder="e.g. 23.2400"></div><div><label for="point-lng">Longitude (−180 to 180)</label><input id="point-lng" name="longitude" type="number" step="any" min="-180" max="180" required placeholder="e.g. 77.3600"></div></div>
+      <div class="point-detection-note"><strong>Detection abhi enabled nahi hai.</strong> Yeh sirf location/device inventory save karega. Asli camera/audio feed aur compatible AI model connect karne ke baad hi detection possible hai. Demo coordinates ya map pin se real forest activity detect nahi hoti.</div>
+      <p class="dialog-error" id="point-error" aria-live="polite"></p>
+      <div class="dialog-actions"><button class="button button-secondary" type="button" id="cancel-point">Cancel</button><button class="button button-primary" type="submit">Save location</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+name: Deploy GreenGuard AI to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - shivnandan225-green-guard-ai
+    paths:
+      - "app/**"
+      - "README.md"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Build static site
+        shell: bash
+        run: |
+          mkdir -p site/static
+          cp app/static/* site/static/
+          cp app/static/index.html site/index.html
+          python - <<'PY'
+          from pathlib import Path
+
+          page = Path("site/index.html")
+          html = page.read_text(encoding="utf-8")
+          html = html.replace('href="/static/styles.css"', 'href="static/styles.css"')
+          html = html.replace(
+              '<script src="/static/app.js"></script>',
+              '<script src="static/static-demo.js"></script>\n  <script src="static/app.js"></script>',
+          )
+          page.write_text(html, encoding="utf-8")
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
