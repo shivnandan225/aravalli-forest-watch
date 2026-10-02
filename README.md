@@ -3,14 +3,14 @@
 **Eyes in the Sky. Eyes on the Ground.**  
 An independent environmental-monitoring prototype and seminar experience.
 
-[![Live demo](https://img.shields.io/badge/Live%20demo-GitHub%20Pages-2f6b43)](https://shivnandan225.github.io/github-copilot-seminar/)
+[![Live demo](https://img.shields.io/badge/Live%20demo-GitHub%20Pages-2f6b43)](https://shivnandan225.github.io/aravalli-forest-watch/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)](https://fastapi.tiangolo.com/)
 [![Maps](https://img.shields.io/badge/Maps-Leaflet-199900)](https://leafletjs.com/)
 
 GreenGuard presents a three-part journey: arrive in an Aravalli landscape, learn about its ecological context, then explore a map-led monitoring and human-review prototype.
 
-**[Open the live demo](https://shivnandan225.github.io/github-copilot-seminar/)** · [View the repository](https://github.com/shivnandan225/github-copilot-seminar)
+**[Open the live demo](https://shivnandan225.github.io/aravalli-forest-watch/)** · [View the repository](https://github.com/shivnandan225/aravalli-forest-watch)
 
 > The selectable starting pin is an approximate location near Udaipur, Rajasthan. Its map boundary and device locations are illustrative—not an official forest boundary. The Aravalli range is in north-western India, not Madhya Pradesh.
 
@@ -19,6 +19,8 @@ GreenGuard presents a three-part journey: arrive in an Aravalli landscape, learn
 1. **Arrive:** a nature-inspired welcome and credited Aravalli photographs.
 2. **Understand:** short stories about wildlife, water, communities, and landscape change.
 3. **Stand watch:** an interactive map, regional weather-model context, local camera preview, synthetic alert walkthrough, human review queue, and observation-report form.
+
+The landscape chapter includes an optional, user-started **90-second cinematic photo film** with gently animated, credited Aravalli photographs, timed captions, and English or Hindi browser narration. It is an illustrated story—not recorded or live field footage.
 
 The prototype demonstrates a possible monitoring workflow, not a deployed forest surveillance system. It does not identify people or determine that a crime occurred.
 
@@ -30,6 +32,8 @@ The prototype demonstrates a possible monitoring workflow, not a deployed forest
 | Zone and point registration | Create map zones, load a GeoJSON boundary, and register camera/acoustic/location placeholders |
 | Regional weather | Current Open-Meteo model conditions near the selected demo zone; not a forest sensor reading |
 | Camera preview | Optional permissioned camera from the visitor's own device, or image/video preview; media is not saved |
+| Visitor video preview | Anyone opening the public site can choose a local clip up to 20 MB and play it in the page; the browser checks video metadata only and does not run AI detection or send the clip |
+| Aravalli story film | A 90-second, captioned animated-photo sequence with optional English/Hindi speech synthesis |
 | Media inspection | Basic file readability checks only; no object-detection model is configured |
 | Demonstration alerts | One-click sample and timed synthetic scenarios for camera, acoustic, and satellite-review workflows |
 | Human review | Mark a sample event reviewed, dismiss it, or reopen it |
@@ -55,7 +59,7 @@ The application starts in **DEMO DATA MODE**. There are no configured live fores
 - The 60-second walkthrough creates synthetic events; it makes no real-world detections.
 - The alert tone is browser-generated, opt-in, and demonstration-only.
 - Local webcam use requires the visitor's permission. It is not an Aravalli field camera.
-- Uploaded media is inspected for basic readability only and is not saved or analyzed by an object detector.
+- User-selected video stays in the visitor's browser for playback and metadata checks; it is not uploaded or saved. Image readability checks use the Pages browser adapter or the local FastAPI backend; media is not saved and no object detector is configured.
 - Weather is a regional model estimate. Map imagery is geographic context, not proof of current conditions.
 - Wildlife examples are associated with parts of the broader Aravalli region; they do not confirm sightings at the demo pin.
 - Automated change detection can produce false positives and requires verification.
@@ -147,7 +151,7 @@ These are potential next steps; they are not live features:
 
 ## Credits and sources
 
-The landscape story uses still photographs from Wikimedia Commons; photographer, location, and license are linked beside each image. Map layers are credited in the map. Regional weather is provided by [Open-Meteo](https://open-meteo.com/). Wildlife and landscape descriptions are general context, not site-specific ecological claims.
+The landscape story uses still photographs from Wikimedia Commons; photographer, location, and license are linked beside each image. Its 90-second film animates those stills and uses optional browser-generated narration. Map layers are credited in the map. Regional weather is provided by [Open-Meteo](https://open-meteo.com/). Wildlife and landscape descriptions are general context, not site-specific ecological claims.
 
 ## Built with GitHub Copilot
 
@@ -159,7 +163,7 @@ GreenGuard AI aims to demonstrate how geospatial interfaces, environmental conte
 
 **Eyes in the Sky. Eyes on the Ground.**
 
-- **Live demo:** [shivnandan225.github.io/github-copilot-seminar](https://shivnandan225.github.io/github-copilot-seminar/)
-- **Repository:** [github.com/shivnandan225/github-copilot-seminar](https://github.com/shivnandan225/github-copilot-seminar)
+- **Live demo:** [shivnandan225.github.io/aravalli-forest-watch](https://shivnandan225.github.io/aravalli-forest-watch/)
+- **Repository:** [github.com/shivnandan225/aravalli-forest-watch](https://github.com/shivnandan225/aravalli-forest-watch)
 - **Author:** Shivnandan
 - **Category:** Environmental monitoring · AI prototype · geospatial technology

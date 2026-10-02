@@ -5,7 +5,7 @@
     selectedPoint: null, uploadedBoundary: null, weatherLoaded: false, currentScreen: 'entry',
     filmIndex: 0, filmTimer: null, demoTimer: null, demoBusy: false, demoRemaining: 60,
     demoIndex: 0, demoCount: 0, soundEnabled: false, audioContext: null, toastTimer: null, cameraStream: null,
-    reports: [],
+    reports: [], filmElapsed: 0, filmPlaying: false, filmPaused: false, mediaPreviewUrl: null,
   };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -39,6 +39,23 @@
     { location: 'UDAIPUR · RAJASTHAN', credit: 'TeshTesh · CC BY-SA 4.0', source: 'https://commons.wikimedia.org/wiki/File:A_view_of_Udaipur_Aravalli_Hills_Rajasthan_India.jpg' },
     { location: 'RAJASTHAN · ARAVALLI RANGE', credit: 'Adesh Kachhap · CC BY-SA 4.0', source: 'https://commons.wikimedia.org/wiki/File:Rajasthan,_Aravalli_range.jpg' },
     { location: 'GURUGRAM · HARYANA', credit: 'Sudsahab · CC0', source: 'https://commons.wikimedia.org/wiki/File:Aravalli_Hills_near_Gurgaon.jpg' },
+  ];
+  const filmScenes = [
+    {
+      chapter: 'CHAPTER 01 · THE ANCIENT RIDGELINE',
+      en: 'At first light, the hills are not silent. Wind moves through thorn and grass; birds stitch sound across the ridges. The Aravalli is an ancient range, shaped by time and weather. Each slope carries its own story of stone, soil, and life.',
+      hi: 'सुबह की पहली रोशनी में ये पहाड़ खामोश नहीं होते। हवा झाड़ियों और घास से गुजरती है, और पक्षियों की आवाज़ें पहाड़ियों में गूंजती हैं। अरावली एक प्राचीन पर्वतमाला है, जिसे समय और मौसम ने आकार दिया है। हर ढलान पत्थर, मिट्टी और जीवन की अपनी कहानी कहती है।',
+    },
+    {
+      chapter: 'CHAPTER 02 · WATER FINDS A WAY',
+      en: 'After rain, a dry channel may briefly lead water downhill. Roots hold soil; rocky outcrops offer shelter. Across this long, varied range, habitats shift with place and season. These photographs show different Aravalli landscapes—not one continuous field recording.',
+      hi: 'बारिश के बाद सूखी नदी-धाराओं में कुछ समय के लिए पानी बह सकता है। जड़ें मिट्टी को थामती हैं और चट्टानी जगहें जीवों को आश्रय देती हैं। इस लंबी पर्वतमाला में जगह और मौसम के साथ आवास बदलते हैं। ये तस्वीरें अलग-अलग अरावली दृश्यों की हैं—एक ही स्थान की लगातार रिकॉर्डिंग नहीं।',
+    },
+    {
+      chapter: 'CHAPTER 03 · A FUTURE WE SHARE',
+      en: 'People, wildlife, and working landscapes share these hills. Caring for them begins with listening, learning, and checking what we see. A map can guide attention, but it cannot prove an incident. Human knowledge matters. The hills’ future belongs to all of us.',
+      hi: 'इन पहाड़ियों को लोग, वन्यजीव और कामकाजी परिदृश्य साझा करते हैं। उनकी देखभाल सुनने, सीखने और देखी गई बातों की पुष्टि से शुरू होती है। नक्शा ध्यान दिला सकता है, लेकिन किसी घटना का प्रमाण नहीं होता। स्थानीय समझ और मानवीय समीक्षा जरूरी हैं। इन पहाड़ियों का भविष्य हम सबका है।',
+    },
   ];
   const demoSequence = ['Camera', 'Acoustic', 'Satellite'];
 
@@ -116,20 +133,88 @@
     $('#film-location').textContent = detail.location;
     $('#film-credit').textContent = detail.credit;
     $('#film-source').href = detail.source;
+    $('#film-chapter').textContent = filmScenes[state.filmIndex].chapter;
+    updateFilmCaption();
   }
 
-  function toggleFilm() {
-    const button = $('#film-play');
-    if (state.filmTimer) {
-      clearInterval(state.filmTimer);
-      state.filmTimer = null;
-      button.textContent = '▶';
-      button.setAttribute('aria-label', 'Play automatic photo journey');
-    } else {
-      state.filmTimer = window.setInterval(() => setFilm(state.filmIndex + 1), 6000);
-      button.textContent = 'Ⅱ';
-      button.setAttribute('aria-label', 'Pause automatic photo journey');
+  function updateFilmCaption() {
+    const language = $('#film-language').value === 'hi-IN' ? 'hi' : 'en';
+    $('#film-narration').textContent = filmScenes[state.filmIndex][language];
+  }
+
+  function speakFilmScene() {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(
+      filmScenes[state.filmIndex][$('#film-language').value === 'hi-IN' ? 'hi' : 'en'],
+    );
+    utterance.lang = $('#film-language').value;
+    utterance.rate = .92;
+    utterance.pitch = .97;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function updateFilmProgress() {
+    const seconds = Math.min(state.filmElapsed, 90);
+    const timestamp = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    $('#film-elapsed').textContent = `${timestamp} / 01:30`;
+    $('#film-progress-fill').style.width = `${seconds / 90 * 100}%`;
+    $('.film-progress').setAttribute('aria-valuenow', String(seconds));
+  }
+
+  function stopFilm(completed = false) {
+    if (state.filmTimer) clearInterval(state.filmTimer);
+    state.filmTimer = null;
+    state.filmPlaying = false;
+    state.filmPaused = !completed;
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    $('#film-play').textContent = completed ? '↻ Replay story' : state.filmElapsed ? '▶ Resume story' : '▶ Play story';
+    $('#film-play').setAttribute('aria-label', completed ? 'Replay the 90-second narrated Aravalli story' : state.filmElapsed ? 'Resume the narrated Aravalli story' : 'Play the 90-second narrated Aravalli story');
+    $('#film-play').setAttribute('aria-pressed', 'false');
+  }
+
+  function startFilm() {
+    if (state.filmPlaying) {
+      stopFilm();
+      return;
     }
+    if (!state.filmPaused || state.filmElapsed >= 90) {
+      state.filmElapsed = 0;
+      setFilm(0);
+      updateFilmProgress();
+    }
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      notify('Your browser does not support voice narration. The 90-second photo film and captions will still play.');
+    }
+    state.filmPlaying = true;
+    state.filmPaused = false;
+    $('#film-play').textContent = 'Ⅱ Pause story';
+    $('#film-play').setAttribute('aria-label', 'Pause the narrated Aravalli story');
+    speakFilmScene();
+    $('#film-play').setAttribute('aria-pressed', 'true');
+    state.filmTimer = window.setInterval(() => {
+      state.filmElapsed += 1;
+      if (state.filmElapsed >= 90) {
+        state.filmElapsed = 90;
+        updateFilmProgress();
+        stopFilm(true);
+        return;
+      }
+      const chapter = Math.floor(state.filmElapsed / 30);
+      if (chapter !== state.filmIndex) {
+        setFilm(chapter);
+        speakFilmScene();
+      }
+      updateFilmProgress();
+    }, 1000);
+  }
+
+  function selectFilmChapter(index) {
+    const chapter = (index + filmScenes.length) % filmScenes.length;
+    setFilm(chapter);
+    if (state.filmPlaying) state.filmElapsed = chapter * 30;
+    updateFilmProgress();
+    if (state.filmPlaying) speakFilmScene();
   }
 
   function weatherDescription(code) {
@@ -522,7 +607,29 @@
 
   async function inspectMedia(file) {
     const result = $('#media-result');
-    result.textContent = 'Checking selected media… no activity detection is configured.';
+    if (file.type.startsWith('video/')) {
+      const video = $('#camera-video');
+      result.textContent = 'Checking this video in your browser…';
+      try {
+        if (video.readyState < 1) {
+          await new Promise((resolve, reject) => {
+            const timeout = window.setTimeout(() => reject(new Error('Video metadata timed out.')), 10000);
+            video.addEventListener('loadedmetadata', () => { clearTimeout(timeout); resolve(); }, { once: true });
+            video.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('This video could not be decoded by the browser.')); }, { once: true });
+          });
+        }
+        if (!video.videoWidth || !video.videoHeight || !Number.isFinite(video.duration)) {
+          throw new Error('The browser could not read this video’s dimensions and duration.');
+        }
+        const duration = Math.floor(video.duration);
+        const length = `${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`;
+        result.textContent = `Video ready · ${video.videoWidth} × ${video.videoHeight} px · ${length} · stays in this browser. No AI detector is configured.`;
+      } catch (error) {
+        result.textContent = `${error.message} The clip stays in this browser; no AI analysis was performed.`;
+      }
+      return;
+    }
+    result.textContent = 'Checking selected image… no activity detection is configured.';
     const form = new FormData();
     form.append('file', file);
     try {
@@ -532,6 +639,21 @@
     } catch (error) {
       result.textContent = `Media check failed: ${error.message}`;
     }
+  }
+
+  function releaseMediaPreview() {
+    if (state.mediaPreviewUrl) URL.revokeObjectURL(state.mediaPreviewUrl);
+    state.mediaPreviewUrl = null;
+    const image = $('#image-preview');
+    image.removeAttribute('src');
+    image.dataset.objectUrl = '';
+    image.hidden = true;
+    const video = $('#camera-video');
+    video.pause();
+    video.srcObject = null;
+    video.removeAttribute('src');
+    video.load();
+    video.hidden = true;
   }
 
   async function toggleWebcam() {
@@ -552,9 +674,13 @@
       return;
     }
     try {
+      releaseMediaPreview();
       state.cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       video.srcObject = state.cameraStream;
       video.hidden = false;
+      video.controls = false;
+      video.autoplay = true;
+      video.muted = true;
       $('#camera-placeholder').hidden = true;
       $('#capture-frame-button').hidden = false;
       button.textContent = 'Stop my camera';
@@ -608,10 +734,20 @@
     $$('[data-story]').forEach((button) => button.addEventListener('click', () => openStory(button.dataset.story)));
     $('#story-close').addEventListener('click', () => $('#story-dialog').close());
     $('#story-next').addEventListener('click', () => openStory($('#story-next').dataset.story));
-    $('#film-prev').addEventListener('click', () => setFilm(state.filmIndex - 1));
-    $('#film-next').addEventListener('click', () => setFilm(state.filmIndex + 1));
-    $$('#film-dots button').forEach((button, index) => button.addEventListener('click', () => setFilm(index)));
-    $('#film-play').addEventListener('click', toggleFilm);
+    $('#film-prev').addEventListener('click', () => selectFilmChapter(state.filmIndex - 1));
+    $('#film-next').addEventListener('click', () => selectFilmChapter(state.filmIndex + 1));
+    $$('#film-dots button').forEach((button, index) => button.addEventListener('click', () => selectFilmChapter(index)));
+    $('#film-play').addEventListener('click', startFilm);
+    $('#film-language').addEventListener('change', () => {
+      updateFilmCaption();
+      if (state.filmPlaying) speakFilmScene();
+    });
+    $('#film-media').addEventListener('keydown', (event) => {
+      if (event.code === 'Space' && event.target === $('#film-media')) {
+        event.preventDefault();
+        startFilm();
+      }
+    });
     $('#mobile-menu').addEventListener('click', () => $('#sidebar').classList.toggle('is-open'));
     $$('[data-scroll]').forEach((button) => button.addEventListener('click', () => {
       document.getElementById(button.dataset.scroll).scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -684,6 +820,11 @@
     $('#media-upload').addEventListener('change', (event) => {
       const file = event.target.files[0];
       if (!file) return;
+      if (file.size > 20 * 1024 * 1024) {
+        event.target.value = '';
+        notify('Choose an image or video no larger than 20 MB.');
+        return;
+      }
       if (state.cameraStream) {
         state.cameraStream.getTracks().forEach((track) => track.stop());
         state.cameraStream = null;
@@ -692,25 +833,32 @@
         $('#capture-frame-button').hidden = true;
         $('#webcam-button').textContent = '◎ Start my camera';
       }
+      releaseMediaPreview();
       const previewUrl = URL.createObjectURL(file);
       if (file.type.startsWith('image/')) {
         const image = $('#image-preview');
-        const oldUrl = image.dataset.objectUrl;
-        if (oldUrl) URL.revokeObjectURL(oldUrl);
         image.dataset.objectUrl = previewUrl;
+        state.mediaPreviewUrl = previewUrl;
         image.src = previewUrl;
         image.hidden = false;
         $('#camera-video').hidden = true;
       } else if (file.type.startsWith('video/')) {
+        state.mediaPreviewUrl = previewUrl;
         $('#image-preview').hidden = true;
         const video = $('#camera-video');
         video.srcObject = null;
         video.src = previewUrl;
         video.controls = true;
-        video.muted = true;
+        video.autoplay = false;
+        video.muted = false;
         video.hidden = false;
+      } else {
+        URL.revokeObjectURL(previewUrl);
+        notify('Choose a supported image or video file.');
+        return;
       }
       $('#camera-placeholder').hidden = true;
+      $('#media-result').textContent = `${file.name} · ${(file.size / (1024 * 1024)).toFixed(1)} MB · preview is local to this page.`;
       inspectMedia(file);
       event.target.value = '';
     });
@@ -722,6 +870,8 @@
       if (state.cameraStream) state.cameraStream.getTracks().forEach((track) => track.stop());
       if (state.filmTimer) clearInterval(state.filmTimer);
       if (state.demoTimer) clearInterval(state.demoTimer);
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (state.mediaPreviewUrl) URL.revokeObjectURL(state.mediaPreviewUrl);
     });
   }
 

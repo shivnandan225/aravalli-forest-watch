@@ -61,11 +61,13 @@
             <img class="film-image" src="https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Rajasthan%2C_Aravalli_range.jpg/1920px-Rajasthan%2C_Aravalli_range.jpg" alt="Aravalli mountain landscape in Rajasthan" loading="lazy" referrerpolicy="no-referrer">
             <img class="film-image" src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Aravalli_Hills_near_Gurgaon.jpg" alt="Aravalli hills near Gurugram, Haryana" loading="lazy" referrerpolicy="no-referrer">
             <div class="film-wash"></div>
-            <div class="film-stamp"><span class="rec-dot"></span> FIELD STORY <span>STILL PHOTOGRAPHS · NOT LIVE VIDEO</span></div>
+            <div class="film-stamp"><span class="rec-dot"></span> A 90-SECOND ARAVALLI STORY <span>ANIMATED, CREDITED PHOTOGRAPHS · NOT LIVE FOOTAGE</span></div>
+            <div class="film-story-caption" aria-live="polite"><span id="film-chapter">CHAPTER 01 · THE ANCIENT RIDGELINE</span><p id="film-narration">At first light, the hills are not silent. Wind moves through thorn and grass; birds stitch sound across the ridges. The Aravalli is an ancient range, shaped by time and weather. Each slope carries its own story of stone, soil, and life.</p></div>
             <div class="film-caption"><span id="film-location">UDAIPUR · RAJASTHAN</span><small id="film-credit">TeshTesh · CC BY-SA 4.0</small></div>
-            <div class="film-controls"><button id="film-prev" type="button" aria-label="Previous landscape image">←</button><div class="film-dots" id="film-dots" aria-label="Choose landscape photograph"><button class="is-active" type="button" aria-label="Udaipur Aravalli"></button><button type="button" aria-label="Rajasthan Aravalli"></button><button type="button" aria-label="Gurugram Aravalli"></button></div><button id="film-next" type="button" aria-label="Next landscape image">→</button><button id="film-play" type="button" aria-label="Pause automatic photo journey">Ⅱ</button></div>
+            <div class="film-controls"><button id="film-prev" type="button" aria-label="Previous landscape photograph">←</button><div class="film-dots" id="film-dots" aria-label="Choose landscape photograph"><button class="is-active" type="button" aria-label="Udaipur Aravalli"></button><button type="button" aria-label="Rajasthan Aravalli"></button><button type="button" aria-label="Gurugram Aravalli"></button></div><button id="film-next" type="button" aria-label="Next landscape photograph">→</button><label class="film-language"><span class="screen-reader-only">Story language</span><select id="film-language"><option value="en-IN">English</option><option value="hi-IN">हिंदी</option></select></label><button id="film-play" class="film-play" type="button" aria-label="Play the 90-second narrated Aravalli story">▶ Play story</button><span id="film-elapsed" class="film-elapsed">00:00 / 01:30</span></div>
+            <div class="film-progress" role="progressbar" aria-label="Story film progress" aria-valuemin="0" aria-valuemax="90" aria-valuenow="0"><span id="film-progress-fill"></span></div>
           </div>
-          <div class="film-credit-line"><span>PHOTO JOURNEY · SLOW CINEMATIC PAN</span><a id="film-source" href="https://commons.wikimedia.org/wiki/File:A_view_of_Udaipur_Aravalli_Hills_Rajasthan_India.jpg" target="_blank" rel="noopener noreferrer">View image &amp; licence ↗</a></div>
+          <div class="film-credit-line"><span>90-SECOND CAPTIONED PHOTO FILM · OPTIONAL BROWSER VOICE</span><a id="film-source" href="https://commons.wikimedia.org/wiki/File:A_view_of_Udaipur_Aravalli_Hills_Rajasthan_India.jpg" target="_blank" rel="noopener noreferrer">View image &amp; licence ↗</a></div>
         </div>
       </div>
       <div class="story-rail" aria-label="Explore topics">
@@ -140,16 +142,16 @@
             <div class="panel-heading"><div><span class="micro-label">GROUND-LEVEL OBSERVATION · USER CONTROLLED</span><h2>Camera preview</h2><p>Choose a local image or video, or grant camera permission for a private browser preview. No field camera is connected.</p></div><span class="zone-chip"><i></i> LOCAL ONLY</span></div>
             <div class="camera-workspace">
               <div class="camera-preview">
-                <div class="camera-placeholder" id="camera-placeholder"><span>⌕</span><strong>No camera connected</strong><small>Upload media or start your own device camera.</small></div>
+                <div class="camera-placeholder" id="camera-placeholder"><span>⌕</span><strong>No media selected</strong><small>Choose your own video to preview and play it here.</small></div>
                 <img id="image-preview" alt="Locally selected image preview" hidden>
                 <video id="camera-video" playsinline autoplay muted hidden></video>
               </div>
               <div class="camera-actions">
-                <label class="button button-secondary upload-button">＋ Choose image / video<input id="media-upload" type="file" accept="image/*,video/*"></label>
+                <label class="button button-secondary upload-button">＋ Choose your image / video<input id="media-upload" type="file" accept="image/*,video/*"></label>
                 <button class="button button-secondary" id="webcam-button" type="button">◎ Start my camera</button>
                 <button class="button button-secondary" id="capture-frame-button" type="button" hidden>Capture local frame</button>
                 <p id="media-result" role="status" aria-live="polite">No media is uploaded or analyzed.</p>
-                <small>Basic readability check only · no object-detection model configured · uploads are not saved.</small>
+                <small>Your clip plays in this panel. Maximum 20 MB. Basic file/readability check only—not AI detection. The demo does not save your upload.</small>
               </div>
             </div>
           </section>
