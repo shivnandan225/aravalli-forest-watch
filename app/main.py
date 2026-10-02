@@ -1,5 +1,6 @@
 import json
 import math
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,6 +52,22 @@ class MonitoringPointInput(BaseModel):
 class DemoEventInput(BaseModel):
     category: Literal["Camera", "Acoustic", "Satellite"]
     zone_id: str = "demo-aravalli"
+
+
+class ReportInput(BaseModel):
+    observation_type: Literal[
+        "Possible tree cutting",
+        "Possible mining or excavation",
+        "Wildlife concern",
+        "Fire or smoke observed",
+        "Other environmental concern",
+    ]
+    observed_at: datetime
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    place: str = Field(min_length=2, max_length=120)
+    description: str = Field(min_length=5, max_length=1200)
+    contact_email: str | None = Field(default=None, max_length=254)
 
 
 def valid_position(position):
@@ -206,6 +223,37 @@ def review_event(event_id: str, review: EventReview):
     if event is None:
         raise HTTPException(404, "Event not found.")
     return event
+
+
+@app.get("/api/reports")
+def reports():
+    return database.list_reports()
+
+
+@app.post("/api/reports", status_code=201)
+def create_report(report: ReportInput):
+    place = report.place.strip()
+    description = report.description.strip()
+    contact_email = report.contact_email.strip() if report.contact_email else None
+    if len(place) < 2 or len(description) < 5:
+        raise HTTPException(422, "Place and description must contain meaningful text.")
+    if contact_email and not re.fullmatch(
+        r"[^@\s]+@[^@\s]+\.[^@\s]+", contact_email
+    ):
+        raise HTTPException(422, "Contact email must be a valid email address.")
+    saved = database.create_report({
+        "id": f"report-{uuid.uuid4().hex[:10]}",
+        "observation_type": report.observation_type,
+        "observed_at": report.observed_at.isoformat(),
+        "latitude": report.latitude,
+        "longitude": report.longitude,
+        "place": place,
+        "description": description,
+        "contact_email": contact_email,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    saved["storage"] = "local SQLite database"
+    return saved
 
 
 @app.post("/api/demo/events", status_code=201)

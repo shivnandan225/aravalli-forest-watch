@@ -1,635 +1,737 @@
-const state = {
-  zones: [], points: [], events: [], map: null, layers: [], selectedPoint: null,
-  cameraStream: null, uploadedBoundary: null, demoTimer: null, demoRemaining: 60,
-  demoEventsSent: 0, nextDemoEventAt: 50, demoScenarioIndex: 0, demoBusy: false, weatherLoaded: false,
-};
-const $ = (selector) => document.querySelector(selector);
+(() => {
+  const ARAVALLI = { latitude: 24.58, longitude: 73.68 };
+  const state = {
+    zones: [], points: [], events: [], map: null, layerControl: null, overlays: [],
+    selectedPoint: null, uploadedBoundary: null, weatherLoaded: false, currentScreen: 'entry',
+    filmIndex: 0, filmTimer: null, demoTimer: null, demoBusy: false, demoRemaining: 60,
+    demoIndex: 0, demoCount: 0, soundEnabled: false, audioContext: null, toastTimer: null, cameraStream: null,
+    reports: [],
+  };
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const stories = [
+    {
+      id: 'wildlife', index: '01 — KNOW THE LAND', title: 'Life in the hills',
+      body: 'The Aravalli range contains varied dryland and forest habitats. Leopards, striped hyenas, jackals, nilgai and many birds are associated with parts of this broad landscape. Their presence at any particular place depends on local habitat and evidence; this prototype has no wildlife observations.',
+      caveat: 'Regional wildlife examples only. They do not confirm an animal sighting at the illustrative Udaipur map pin.',
+      source: 'https://forest.rajasthan.gov.in/',
+    },
+    {
+      id: 'water', index: '02 — STONE & WATER', title: 'Water in a dry land',
+      body: 'Ridges, soils, vegetation and seasonal drainage shape how rain moves through a landscape. The effects of land-use change depend on the specific catchment, geology, rainfall and communities. This prototype does not measure groundwater, river flow or watershed health.',
+      caveat: 'Water benefits and risks are local and evidence-dependent; no hydrology data is connected here.',
+      source: 'https://www.indiawaterportal.org/',
+    },
+    {
+      id: 'people', index: '03 — PEOPLE & PLACE', title: 'A landscape people call home',
+      body: 'Aravalli landscapes are connected to many towns, villages, livelihoods and cultural histories across multiple states. Responsible stewardship means listening to the people who live in each place, respecting land rights and using verified local information.',
+      caveat: 'This is general context, not a description of a specific community or land parcel.',
+      source: 'https://forest.rajasthan.gov.in/',
+    },
+    {
+      id: 'pressure', index: '04 — WHY CARE MATTERS', title: 'If hills are lost',
+      body: 'Clearing vegetation, fragmenting habitat or disturbing a watershed can affect ecological connections, soils and local water systems. Outcomes vary and should be assessed using credible local evidence—not assumed from an alert or a map image.',
+      caveat: 'No damage, mining, tree cutting or other activity is being reported by this demo.',
+      source: 'https://www.moef.gov.in/',
+    },
+  ];
+  const filmDetails = [
+    { location: 'UDAIPUR · RAJASTHAN', credit: 'TeshTesh · CC BY-SA 4.0', source: 'https://commons.wikimedia.org/wiki/File:A_view_of_Udaipur_Aravalli_Hills_Rajasthan_India.jpg' },
+    { location: 'RAJASTHAN · ARAVALLI RANGE', credit: 'Adesh Kachhap · CC BY-SA 4.0', source: 'https://commons.wikimedia.org/wiki/File:Rajasthan,_Aravalli_range.jpg' },
+    { location: 'GURUGRAM · HARYANA', credit: 'Sudsahab · CC0', source: 'https://commons.wikimedia.org/wiki/File:Aravalli_Hills_near_Gurgaon.jpg' },
+  ];
+  const demoSequence = ['Camera', 'Acoustic', 'Satellite'];
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[character]);
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(path, options);
-  if (!response.ok) {
-    let message = `Request failed (${response.status})`;
-    try { message = (await response.json()).detail || message; } catch {}
-    throw new Error(message);
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[character]);
   }
-  return response.json();
-}
 
-function notify(message) {
-  const toast = $('#toast');
-  toast.textContent = message;
-  toast.classList.add('show');
-  window.setTimeout(() => toast.classList.remove('show'), 3200);
-}
-
-function updateClock() {
-  $('#clock').textContent = new Intl.DateTimeFormat(undefined, {
-    weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(new Date());
-}
-
-function weatherDescription(code) {
-  if (code === 0) return ['Clear sky', '☀'];
-  if ([1, 2].includes(code)) return ['Partly cloudy', '◒'];
-  if (code === 3) return ['Overcast', '☁'];
-  if ([45, 48].includes(code)) return ['Fog', '≋'];
-  if ([51, 53, 55, 56, 57].includes(code)) return ['Drizzle', '☂'];
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return ['Rain', '☂'];
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return ['Snow', '❄'];
-  if ([95, 96, 99].includes(code)) return ['Thunderstorm', 'ϟ'];
-  return ['Conditions available', '◉'];
-}
-
-async function loadWeather() {
-  const zone = state.zones.find((item) => item.id === $('#demo-zone').value)
-    || state.zones.find((item) => item.id === 'demo-aravalli')
-    || state.zones[0];
-  if (!zone) return;
-  const status = $('#weather-status');
-  status.textContent = 'Refreshing current regional model conditions…';
-  try {
-    const query = new URLSearchParams({
-      latitude: zone.latitude.toFixed(3),
-      longitude: zone.longitude.toFixed(3),
-    });
-    const data = await api(`/api/weather?${query}`);
-    const current = data.current;
-    if (!current || !Number.isFinite(current.temperature_2m)) {
-      throw new Error('Current regional conditions are unavailable.');
+  async function api(path, options = {}) {
+    const response = await fetch(path, options);
+    if (!response.ok) {
+      let message = `Request failed (${response.status})`;
+      try { message = (await response.json()).detail || message; } catch { /* Keep the HTTP status message. */ }
+      throw new Error(message);
     }
-    const [description, symbol] = weatherDescription(current.weather_code);
-    $('#weather-symbol').textContent = symbol;
-    $('#weather-symbol').title = description;
-    $('#weather-temperature').textContent = `${Math.round(current.temperature_2m)}°C`;
-    $('#weather-humidity').textContent = `${Math.round(current.relative_humidity_2m)}%`;
-    $('#weather-wind').textContent = `${Math.round(current.wind_speed_10m)} km/h`;
-    $('#weather-rain').textContent = `${Number(current.precipitation).toFixed(1)} mm`;
-    const observedAt = current.time ? new Date(current.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'time unavailable';
-    status.textContent = `${description} · Open-Meteo model time ${observedAt}`;
-  } catch (error) {
-    status.textContent = `Weather feed unavailable: ${error.message}`;
+    return response.json();
   }
-}
 
-function initMap() {
-  const mapElement = $('#map');
-  if (!window.L) {
-    mapElement.innerHTML = '<div class="empty-events">Map library could not load. Connect to the internet to use the interactive map.</div>';
-    return;
+  function notify(message) {
+    const toast = $('#alert-toast');
+    $('#alert-toast-text').textContent = message;
+    toast.hidden = false;
+    clearTimeout(state.toastTimer);
+    state.toastTimer = window.setTimeout(() => { toast.hidden = true; }, 6000);
   }
-  state.map = L.map(mapElement, { zoomControl: false }).setView([23.24, 77.36], 10);
-  L.control.zoom({ position: 'bottomright' }).addTo(state.map);
-  const street = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  });
-  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 18, attribution: 'Tiles &copy; Esri — imagery basemap only',
-  }).addTo(state.map);
-  L.control.layers({ 'Street map': street, 'Satellite basemap (imagery only)': satellite }, {}, { position: 'topright', collapsed: true }).addTo(state.map);
-  state.map.on('click', (event) => {
-    state.selectedPoint = event.latlng;
-    const selection = $('#map-selection');
-    selection.hidden = false;
-    selection.textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`;
-    $('#zone-lat').value = event.latlng.lat.toFixed(6);
-    $('#zone-lng').value = event.latlng.lng.toFixed(6);
-  });
-  window.setTimeout(() => state.map.invalidateSize(), 100);
-}
 
-function renderZones() {
-  $('#zone-count').textContent = state.zones.length;
-  $('#zone-list').innerHTML = state.zones.map((zone) =>
-    `<div class="zone-chip"><i></i><span>${escapeHtml(zone.name)}</span><small>${zone.latitude.toFixed(3)}, ${zone.longitude.toFixed(3)}</small></div>`
-  ).join('');
-  if (!state.map) return;
-  state.layers.forEach((layer) => state.map.removeLayer(layer));
-  state.layers = [];
-  state.zones.forEach((zone) => {
-    const boundary = L.geoJSON(zone.boundary, {
-      style: { color: '#87d298', weight: 2, opacity: .8, fillColor: '#63ae75', fillOpacity: .09, dashArray: '7 5' },
-    }).addTo(state.map);
-    const marker = L.marker([zone.latitude, zone.longitude], {
-      icon: L.divIcon({ className: '', html: '<span class="zone-marker">⌖</span>', iconSize: [31, 31], iconAnchor: [15, 15] }),
-    }).bindPopup(`<strong>${escapeHtml(zone.name)}</strong><br><span style="color:#e2be82">Illustrative zone · not verified</span>`).addTo(state.map);
-    state.layers.push(boundary, marker);
-  });
-  state.events.forEach((event) => {
-    if (!Number.isFinite(event.latitude) || !Number.isFinite(event.longitude)) return;
-    const isSimulation = event.source.startsWith('DEMO SIMULATION');
-    const marker = L.marker([event.latitude, event.longitude], {
-      icon: L.divIcon({
-        className: '',
-        html: `<span class="risk-marker${isSimulation ? ' simulated' : ''}"></span>`,
-        iconSize: [18, 18], iconAnchor: [9, 9],
-      }),
-    }).bindPopup(`<strong>${escapeHtml(event.title)}</strong><br><span style="color:#e2be82">${isSimulation ? 'Synthetic walkthrough · no live observation' : 'Illustrative demo example'} · human review required</span>`).addTo(state.map);
-    state.layers.push(marker);
-  });
-  state.points.forEach((point) => {
-    const icon = point.kind === 'camera' ? '⌕' : point.kind === 'acoustic' ? '〰' : '◎';
-    const marker = L.marker([point.latitude, point.longitude], {
-      icon: L.divIcon({ className: '', html: `<span class="zone-marker">${icon}</span>`, iconSize: [31, 31], iconAnchor: [15, 15] }),
-    }).bindPopup(`<strong>${escapeHtml(point.name)}</strong><br><span style="color:#e2be82">${escapeHtml(point.kind)} · ${escapeHtml(point.status)}</span>`).addTo(state.map);
-    state.layers.push(marker);
-  });
-}
-
-function renderOverview(overview) {
-  $('#zone-count').textContent = overview.zone_count;
-  $('#camera-count').textContent = overview.camera_count;
-  $('#sensor-count').textContent = overview.sensor_count;
-  $('#review-count').textContent = overview.pending_reviews;
-  $('#nav-count').textContent = overview.pending_reviews;
-  $('#db-status').textContent = 'SQLite · connected';
-}
-
-function eventStatusClass(status) {
-  if (status === 'Verified') return 'status-verified';
-  if (status === 'Dismissed') return 'status-dismissed';
-  return 'status-review';
-}
-
-function renderEvents() {
-  const filter = $('#event-filter').value;
-  const events = filter === 'all' ? state.events : state.events.filter((event) => event.status === filter);
-  if (!events.length) {
-    $('#event-list').innerHTML = '<div class="empty-events">No events in this view.</div>';
-    return;
-  }
-  $('#event-list').innerHTML = events.map((event) => {
-    const time = new Date(event.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const actions = event.status === 'Pending review'
-      ? `<button class="verify" data-event="${escapeHtml(event.id)}" data-status="Verified">Verify</button><button data-event="${escapeHtml(event.id)}" data-status="Dismissed">Dismiss</button>`
-      : `<button data-event="${escapeHtml(event.id)}" data-status="Pending review">Reopen</button>`;
-    return `<article class="event-row">
-      <div class="event-icon">${event.category === 'Satellite' ? '◉' : '⌕'}</div>
-      <div class="event-main"><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.description)}</p>
-        <div class="event-meta"><span>${escapeHtml(event.source)}</span><span>·</span><span>${escapeHtml(event.zone_name)}</span><span>·</span><time>${escapeHtml(time)}</time></div>
-      </div>
-      <div class="event-actions"><span class="status-tag ${eventStatusClass(event.status)}">${escapeHtml(event.status)}</span>${actions}</div>
-    </article>`;
-  }).join('');
-}
-
-async function loadDashboard() {
-  try {
-    const [overview, zones, points, events, system] = await Promise.all([
-      api('/api/overview'), api('/api/zones'), api('/api/points'), api('/api/events'), api('/api/system'),
-    ]);
-    state.zones = zones;
-    state.points = points;
-    state.events = events;
-    renderPointZones();
-    renderOverview(overview);
-    renderZones();
-    renderEvents();
-    $('#camera-inventory').textContent = `${overview.camera_count} demo camera placeholder${overview.camera_count === 1 ? '' : 's'} · no live feed`;
-    $('#sensor-inventory').textContent = `${overview.sensor_count} demo sensor placeholder${overview.sensor_count === 1 ? '' : 's'} · no audio feed`;
-    $('#db-status').textContent = `${system.database} · connected`;
-    if (!state.weatherLoaded) {
-      state.weatherLoaded = true;
-      loadWeather();
-    }
-  } catch (error) {
-    notify(`Could not load dashboard: ${error.message}`);
-  }
-}
-
-function renderPointZones() {
-  const selectedZone = $('#point-zone');
-  const demoZone = $('#demo-zone');
-  const previousPointZone = selectedZone.value;
-  const previousDemoZone = demoZone.value;
-  selectedZone.innerHTML = state.zones.map((zone) =>
-    `<option value="${escapeHtml(zone.id)}">${escapeHtml(zone.name)}</option>`
-  ).join('');
-  demoZone.innerHTML = state.zones.map((zone) =>
-    `<option value="${escapeHtml(zone.id)}">${escapeHtml(zone.name)}</option>`
-  ).join('');
-  if (state.zones.some((zone) => zone.id === previousPointZone)) selectedZone.value = previousPointZone;
-  if (state.zones.some((zone) => zone.id === previousDemoZone)) demoZone.value = previousDemoZone;
-}
-
-function updateDemoStatus(message, running = false) {
-  const status = $('#demo-run-status');
-  status.classList.toggle('is-running', running);
-  status.querySelector('span').textContent = message;
-}
-
-function formatSeconds(seconds) {
-  return `00:${String(seconds).padStart(2, '0')}`;
-}
-
-async function emitDemoEvent(category) {
-  if (state.demoBusy) return;
-  state.demoBusy = true;
-  $('#trigger-demo-button').disabled = true;
-  try {
-    await api('/api/demo/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, zone_id: $('#demo-zone').value }),
+  function showScreen(name) {
+    const screens = { entry: $('#entry-view'), landscape: $('#landscape-view'), guardian: $('#guardian-view') };
+    if (!screens[name]) return;
+    Object.entries(screens).forEach(([key, element]) => {
+      element.classList.toggle('is-visible', key === name);
+      element.hidden = key !== name;
     });
-    state.demoEventsSent += 1;
-    await loadDashboard();
-    notify(`${category} walkthrough event added to human review.`);
-  } finally {
-    state.demoBusy = false;
-    $('#trigger-demo-button').disabled = Boolean(state.demoTimer);
-  }
-}
-
-function stopDemo(completed = false, failed = false) {
-  if (state.demoTimer) window.clearInterval(state.demoTimer);
-  state.demoTimer = null;
-  state.demoBusy = false;
-  $('#start-demo-button').disabled = false;
-  $('#start-demo-button').innerHTML = '<span>▶</span> Run 60-sec demo';
-  $('#trigger-demo-button').disabled = false;
-  $('#demo-zone').disabled = false;
-  $('#demo-starting-scenario').disabled = false;
-  document.querySelector('.demo-console').classList.remove('is-simulating');
-  if (failed) {
-    updateDemoStatus('PAUSED · The demo service could not add an event');
-  } else if (completed) {
-    updateDemoStatus(`COMPLETE · ${state.demoEventsSent} synthetic events · review them below`);
-  } else {
-    updateDemoStatus('READY · Not connected to real sensors');
-  }
-}
-
-async function startDemo() {
-  if (state.demoTimer) {
-    stopDemo();
-    notify('Seminar simulation paused. Demo events remain in the review queue.');
-    return;
-  }
-  if (!state.zones.length) {
-    notify('Add a monitoring zone before starting the walkthrough.');
-    return;
+    state.currentScreen = name;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (name === 'guardian') {
+      window.setTimeout(() => state.map?.invalidateSize(), 100);
+      if (!state.weatherLoaded) {
+        state.weatherLoaded = true;
+        loadWeather();
+      }
+    }
   }
 
-  state.demoRemaining = 60;
-  state.demoEventsSent = 0;
-  state.nextDemoEventAt = 50;
-  const firstScenario = $('#demo-starting-scenario').value;
-  const sequence = ['Camera', 'Acoustic', 'Satellite'];
-  state.demoScenarioIndex = sequence.indexOf(firstScenario);
-  $('#start-demo-button').disabled = true;
-  $('#start-demo-button').textContent = 'Starting…';
-  $('#trigger-demo-button').disabled = true;
-  $('#demo-zone').disabled = true;
-  $('#demo-starting-scenario').disabled = true;
-  try {
-    await emitDemoEvent(sequence[state.demoScenarioIndex]);
-  } catch (error) {
-    stopDemo(false, true);
-    notify(`Could not start walkthrough: ${error.message}`);
-    return;
+  function updateClock() {
+    $('#clock').textContent = new Intl.DateTimeFormat(undefined, {
+      weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    }).format(new Date());
   }
-  $('#start-demo-button').disabled = false;
-  $('#start-demo-button').innerHTML = '<span>Ⅱ</span> Pause demo';
-  $('#trigger-demo-button').disabled = true;
-  document.querySelector('.demo-console').classList.add('is-simulating');
-  updateDemoStatus(`SIMULATION RUNNING · ${formatSeconds(state.demoRemaining)} · SYNTHETIC ONLY`, true);
 
-  state.demoTimer = window.setInterval(async () => {
-    state.demoRemaining -= 1;
-    if (state.demoRemaining <= 0) {
-      stopDemo(true);
+  function openStory(id) {
+    const story = stories.find((item) => item.id === id);
+    if (!story) return;
+    $('#story-index').textContent = story.index;
+    $('#story-title').textContent = story.title;
+    $('#story-body').textContent = story.body;
+    $('#story-caveat').textContent = story.caveat;
+    $('#story-source').href = story.source;
+    $('#story-next').dataset.story = stories[(stories.indexOf(story) + 1) % stories.length].id;
+    $('#story-next').textContent = `Explore next story →`;
+    $('#story-dialog').showModal();
+  }
+
+  function setFilm(index) {
+    const images = $$('.film-image');
+    const dots = $$('#film-dots button');
+    state.filmIndex = (index + images.length) % images.length;
+    images.forEach((image, i) => image.classList.toggle('is-active', i === state.filmIndex));
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('is-active', i === state.filmIndex);
+      dot.setAttribute('aria-current', i === state.filmIndex ? 'true' : 'false');
+    });
+    const detail = filmDetails[state.filmIndex];
+    $('#film-location').textContent = detail.location;
+    $('#film-credit').textContent = detail.credit;
+    $('#film-source').href = detail.source;
+  }
+
+  function toggleFilm() {
+    const button = $('#film-play');
+    if (state.filmTimer) {
+      clearInterval(state.filmTimer);
+      state.filmTimer = null;
+      button.textContent = '▶';
+      button.setAttribute('aria-label', 'Play automatic photo journey');
+    } else {
+      state.filmTimer = window.setInterval(() => setFilm(state.filmIndex + 1), 6000);
+      button.textContent = 'Ⅱ';
+      button.setAttribute('aria-label', 'Pause automatic photo journey');
+    }
+  }
+
+  function weatherDescription(code) {
+    if (code === 0) return ['Clear sky', '☀'];
+    if ([1, 2].includes(code)) return ['Partly cloudy', '◒'];
+    if (code === 3) return ['Overcast', '☁'];
+    if ([45, 48].includes(code)) return ['Fog', '≋'];
+    if ([51, 53, 55, 56, 57].includes(code)) return ['Drizzle', '☂'];
+    if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return ['Rain', '☂'];
+    if ([71, 73, 75, 77, 85, 86].includes(code)) return ['Snow', '❄'];
+    if ([95, 96, 99].includes(code)) return ['Thunderstorm', 'ϟ'];
+    return ['Conditions available', '◉'];
+  }
+
+  async function loadWeather() {
+    const zone = state.zones.find((item) => item.id === 'demo-aravalli') || state.zones[0] || ARAVALLI;
+    $('#weather-status').textContent = 'Refreshing regional weather model…';
+    try {
+      const query = new URLSearchParams({ latitude: Number(zone.latitude).toFixed(3), longitude: Number(zone.longitude).toFixed(3) });
+      const data = await api(`/api/weather?${query}`);
+      const current = data.current;
+      if (!current || !Number.isFinite(current.temperature_2m)) throw new Error('Current regional conditions are unavailable.');
+      const [description, symbol] = weatherDescription(current.weather_code);
+      $('#weather-symbol').textContent = symbol;
+      $('#weather-symbol').title = description;
+      $('#weather-temperature').textContent = `${Math.round(current.temperature_2m)}°C`;
+      $('#weather-humidity').textContent = `${Math.round(current.relative_humidity_2m)}%`;
+      $('#weather-wind').textContent = `${Math.round(current.wind_speed_10m)} km/h`;
+      $('#weather-location').textContent = `Near illustrative pin · ${data.latitude.toFixed(2)}, ${data.longitude.toFixed(2)}`;
+      const time = current.time ? new Date(current.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'time unavailable';
+      $('#weather-status').textContent = `${description} · model time ${time} · not a forest sensor`;
+    } catch (error) {
+      $('#weather-status').textContent = `Weather unavailable: ${error.message}`;
+    }
+  }
+
+  function initMap() {
+    const element = $('#map');
+    if (!window.L) {
+      element.innerHTML = '<div class="empty-events">Map library could not load. Internet access is required for the interactive map.</div>';
       return;
     }
-    if (state.demoRemaining > 0 && state.demoRemaining === state.nextDemoEventAt) {
-      state.nextDemoEventAt -= 10;
-      state.demoScenarioIndex = (state.demoScenarioIndex + 1) % sequence.length;
-      try {
-        await emitDemoEvent(sequence[state.demoScenarioIndex]);
-      } catch (error) {
-        stopDemo(false, true);
-        notify(`Walkthrough paused: ${error.message}`);
+    state.map = L.map(element, { zoomControl: false }).setView([ARAVALLI.latitude, ARAVALLI.longitude], 10);
+    L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+    const street = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    });
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18, attribution: 'Tiles &copy; Esri — imagery basemap only',
+    });
+    street.addTo(state.map);
+    state.layerControl = L.control.layers({ 'Street map': street, 'Satellite basemap (imagery only)': satellite }, {}, { position: 'topright', collapsed: true }).addTo(state.map);
+    state.map.on('click', (event) => {
+      state.selectedPoint = event.latlng;
+      $('#map-coordinates').textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)} · selected`;
+      $('#zone-lat').value = event.latlng.lat.toFixed(6);
+      $('#zone-lng').value = event.latlng.lng.toFixed(6);
+      $('#point-lat').value = event.latlng.lat.toFixed(6);
+      $('#point-lng').value = event.latlng.lng.toFixed(6);
+      $('#report-lat').value = event.latlng.lat.toFixed(6);
+      $('#report-lng').value = event.latlng.lng.toFixed(6);
+    });
+  }
+
+  function renderPointZones() {
+    const options = state.zones.map((zone) =>
+      `<option value="${escapeHtml(zone.id)}">${escapeHtml(zone.name)}</option>`).join('');
+    $('#point-zone').innerHTML = options;
+  }
+
+  function renderZones() {
+    if (!state.map) return;
+    state.overlays.forEach((layer) => state.map.removeLayer(layer));
+    state.overlays = [];
+    state.zones.forEach((zone) => {
+      if (zone.boundary) {
+        const boundary = L.geoJSON(zone.boundary, {
+          style: { color: '#c9d99f', weight: 2, opacity: .85, fillColor: '#8fb978', fillOpacity: .08, dashArray: '7 5' },
+        }).addTo(state.map);
+        state.overlays.push(boundary);
+      }
+      const marker = L.marker([zone.latitude, zone.longitude], {
+        icon: L.divIcon({ className: '', html: '<span class="zone-marker">⌖</span>', iconSize: [31, 31], iconAnchor: [15, 15] }),
+      }).bindPopup(`<strong>${escapeHtml(zone.name)}</strong><br><span style="color:#e2be82">Illustrative zone · not verified</span>`).addTo(state.map);
+      state.overlays.push(marker);
+    });
+    state.points.forEach((point) => {
+      const icon = point.kind === 'camera' ? '⌕' : point.kind === 'acoustic' ? '〰' : '◎';
+      const marker = L.marker([point.latitude, point.longitude], {
+        icon: L.divIcon({ className: '', html: `<span class="zone-marker">${icon}</span>`, iconSize: [31, 31], iconAnchor: [15, 15] }),
+      }).bindPopup(`<strong>${escapeHtml(point.name)}</strong><br><span style="color:#e2be82">${escapeHtml(point.kind)} · ${escapeHtml(point.status)}</span>`).addTo(state.map);
+      state.overlays.push(marker);
+    });
+    state.events.forEach((event) => {
+      if (!Number.isFinite(event.latitude) || !Number.isFinite(event.longitude)) return;
+      const simulated = String(event.source).includes('DEMO');
+      const marker = L.marker([event.latitude, event.longitude], {
+        icon: L.divIcon({ className: '', html: `<span class="risk-marker${simulated ? ' simulated' : ''}"></span>`, iconSize: [18, 18], iconAnchor: [9, 9] }),
+      }).bindPopup(`<strong>${escapeHtml(event.title)}</strong><br><span style="color:#e2be82">${simulated ? 'Synthetic example · no live observation' : 'Illustrative demo'} · human review required</span>`).addTo(state.map);
+      state.overlays.push(marker);
+    });
+  }
+
+  function eventStatusClass(status) {
+    if (status === 'Verified') return 'status-verified';
+    if (status === 'Dismissed') return 'status-dismissed';
+    return '';
+  }
+
+  function renderEvents() {
+    const filter = $('#event-filter').value;
+    const events = filter === 'all' ? state.events : state.events.filter((event) => event.status === filter);
+    const pending = state.events.filter((event) => event.status === 'Pending review').length;
+    $('#review-count').textContent = pending;
+    $('#rail-count').textContent = pending;
+    if (!events.length) {
+      $('#event-list').innerHTML = '<div class="empty-events">No events in this view. Demo alerts are synthetic; no real feeds are connected.</div>';
+      return;
+    }
+    $('#event-list').innerHTML = events.map((event) => {
+      const time = new Date(event.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const actions = event.status === 'Pending review'
+        ? `<button class="verify" data-event="${escapeHtml(event.id)}" data-status="Verified">Mark reviewed</button><button data-event="${escapeHtml(event.id)}" data-status="Dismissed">Dismiss</button>`
+        : `<button data-event="${escapeHtml(event.id)}" data-status="Pending review">Reopen</button>`;
+      return `<article class="event-row"><div class="event-icon">${event.category === 'Satellite' ? '◉' : event.category === 'Acoustic' ? '〰' : '⌕'}</div><div class="event-main"><strong>${escapeHtml(event.title)}</strong><p>${escapeHtml(event.description)}</p><div class="event-meta"><span>${escapeHtml(event.source)}</span><span>·</span><span>${escapeHtml(event.zone_name || 'Illustrative region')}</span><span>·</span><time>${escapeHtml(time)}</time></div></div><div class="event-actions"><span class="status-tag ${eventStatusClass(event.status)}">${escapeHtml(event.status)}</span>${actions}</div></article>`;
+    }).join('');
+  }
+
+  async function loadDashboard() {
+    try {
+      const [zones, points, events] = await Promise.all([api('/api/zones'), api('/api/points'), api('/api/events')]);
+      state.zones = zones;
+      state.points = points;
+      state.events = events;
+      renderPointZones();
+      renderEvents();
+      renderZones();
+      const demoZone = zones.find((zone) => zone.id === 'demo-aravalli');
+      if (demoZone) $('#rail-zone-name').textContent = demoZone.name.replace('— illustrative demo region', '').trim();
+      if (!state.weatherLoaded && state.currentScreen === 'guardian') {
+        state.weatherLoaded = true;
+        loadWeather();
+      }
+    } catch (error) {
+      notify(`Could not load monitoring view: ${error.message}`);
+    }
+  }
+
+  async function changeEventStatus(id, status) {
+    try {
+      await api(`/api/events/${encodeURIComponent(id)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+      });
+      await loadDashboard();
+    } catch (error) {
+      notify(`Could not update review status: ${error.message}`);
+    }
+  }
+
+  async function emitDemoEvent(category) {
+    if (state.demoBusy) return;
+    state.demoBusy = true;
+    $('#trigger-demo-button').disabled = true;
+    try {
+      await api('/api/demo/events', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, zone_id: state.zones[0]?.id || 'demo-aravalli' }),
+      });
+      state.demoCount += 1;
+      await loadDashboard();
+      notify('Synthetic demonstration alert created. It is not a real detection.');
+      if (state.soundEnabled) playDemoTone();
+    } finally {
+      state.demoBusy = false;
+      $('#trigger-demo-button').disabled = Boolean(state.demoTimer);
+    }
+  }
+
+  function setDemoStatus(message, running = false) {
+    const status = $('#demo-run-status');
+    status.classList.toggle('is-running', running);
+    $('span', status).textContent = message;
+  }
+
+  function stopDemo(completed = false, failed = false) {
+    if (state.demoTimer) clearInterval(state.demoTimer);
+    state.demoTimer = null;
+    $('#start-demo-button').textContent = '▶ Run 60-sec story';
+    $('#trigger-demo-button').disabled = false;
+    $('#demo-starting-scenario').disabled = false;
+    if (failed) setDemoStatus('Paused · could not save the synthetic event');
+    else if (completed) setDemoStatus(`Complete · ${state.demoCount} synthetic events · review below`);
+    else setDemoStatus('Ready · no real feeds connected');
+  }
+
+  async function startDemo() {
+    if (state.demoTimer) {
+      stopDemo();
+      return;
+    }
+    if (!state.zones.length) {
+      notify('Create a demo monitoring zone before starting.');
+      return;
+    }
+    state.demoRemaining = 60;
+    state.demoCount = 0;
+    state.demoIndex = demoSequence.indexOf($('#demo-starting-scenario').value);
+    $('#start-demo-button').disabled = true;
+    $('#trigger-demo-button').disabled = true;
+    $('#demo-starting-scenario').disabled = true;
+    try {
+      await emitDemoEvent(demoSequence[state.demoIndex]);
+    } catch (error) {
+      stopDemo(false, true);
+      notify(`Could not start demo: ${error.message}`);
+      return;
+    }
+    $('#start-demo-button').disabled = false;
+    $('#start-demo-button').textContent = 'Ⅱ Pause demo';
+    $('#trigger-demo-button').disabled = true;
+    const sendAt = new Set([50, 35, 20]);
+    setDemoStatus('Simulation running · 01:00 · synthetic events only', true);
+    state.demoTimer = window.setInterval(async () => {
+      state.demoRemaining -= 1;
+      if (state.demoRemaining <= 0) {
+        stopDemo(true);
         return;
       }
-    }
-    updateDemoStatus(`SIMULATION RUNNING · ${formatSeconds(state.demoRemaining)} · SYNTHETIC ONLY`, true);
-  }, 1000);
-}
-
-function updatePointTypeHelp() {
-  const descriptions = {
-    monitoring: 'Location marker only; it does not collect or analyze data.',
-    camera: 'Inventory marker only. A live camera feed and compatible vision model are not connected.',
-    acoustic: 'Inventory marker only. A live audio feed and compatible sound model are not connected.',
-  };
-  $('#point-kind-help').textContent = descriptions[$('#point-kind').value];
-}
-
-async function searchLocation() {
-  const query = $('#location-search').value.trim();
-  if (!query) return;
-  if (!state.map) {
-    notify('The map is unavailable. Connect to the internet and reload.');
-    return;
-  }
-  if (query.toLowerCase().includes('aravalli')) {
-    state.map.setView([23.24, 77.36], 10);
-    return;
-  }
-  const button = $('#search-button');
-  button.disabled = true;
-  button.textContent = '…';
-  try {
-    const results = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`).then((response) => response.json());
-    if (!results.length) {
-      notify('No matching location found.');
-      return;
-    }
-    const result = results[0];
-    state.map.setView([Number(result.lat), Number(result.lon)], 11);
-    notify('Location found. Click the map to choose a monitoring point.');
-  } catch {
-    notify('Location search is unavailable. Check your internet connection.');
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Search';
-  }
-}
-
-function makeBoundary(lat, lng) {
-  const latOffset = 0.035;
-  const lngOffset = 0.045;
-  return { type: 'Polygon', coordinates: [[
-    [lng - lngOffset, lat - latOffset],
-    [lng + lngOffset, lat - latOffset],
-    [lng + lngOffset, lat + latOffset],
-    [lng - lngOffset, lat + latOffset],
-    [lng - lngOffset, lat - latOffset],
-  ]] };
-}
-
-async function saveZone(event) {
-  event.preventDefault();
-  const latitude = Number($('#zone-lat').value);
-  const longitude = Number($('#zone-lng').value);
-  const name = $('#zone-name').value.trim();
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    $('#zone-error').textContent = 'Choose a point on the map or enter valid coordinates.';
-    return;
-  }
-  try {
-    await api('/api/zones', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, latitude, longitude, boundary: state.uploadedBoundary || makeBoundary(latitude, longitude) }),
-    });
-    $('#zone-dialog').close();
-    $('#zone-form').reset();
-    state.uploadedBoundary = null;
-    await loadDashboard();
-    notify('Demo monitoring zone created.');
-  } catch (error) {
-    $('#zone-error').textContent = error.message;
-  }
-}
-
-async function savePoint(event) {
-  event.preventDefault();
-  const latitude = Number($('#point-lat').value);
-  const longitude = Number($('#point-lng').value);
-  try {
-    await api('/api/points', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        zone_id: $('#point-zone').value,
-        name: $('#point-name').value.trim(),
-        kind: $('#point-kind').value,
-        latitude,
-        longitude,
-      }),
-    });
-    $('#point-dialog').close();
-    $('#point-form').reset();
-    await loadDashboard();
-    notify('Demo monitoring point added.');
-  } catch (error) {
-    $('#point-error').textContent = error.message;
-  }
-}
-
-async function changeEventStatus(eventId, status) {
-  try {
-    await api(`/api/events/${encodeURIComponent(eventId)}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
-    });
-    state.events = await api('/api/events');
-    renderEvents();
-    renderOverview(await api('/api/overview'));
-    renderZones();
-  } catch (error) {
-    notify(`Could not update review status: ${error.message}`);
-  }
-}
-
-async function inspectUpload(file) {
-  const result = $('#media-result');
-  result.textContent = 'Inspecting upload…';
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const inspection = await api('/api/media/analyze', { method: 'POST', body: form });
-    const dimensions = inspection.dimensions ? ` ${inspection.dimensions[0]} × ${inspection.dimensions[1]} px.` : '';
-    result.textContent = `${inspection.message}${dimensions} Media is not saved.`;
-  } catch (error) {
-    result.textContent = `Upload unavailable: ${error.message}`;
-  }
-}
-
-async function startWebcam() {
-  const button = $('#webcam-button');
-  const video = $('#camera-video');
-  if (state.cameraStream) {
-    state.cameraStream.getTracks().forEach((track) => track.stop());
-    state.cameraStream = null;
-    video.srcObject = null;
-    video.removeAttribute('src');
-    video.controls = false;
-    video.hidden = true;
-    $('.camera-placeholder').hidden = false;
-    button.textContent = 'Start webcam';
-    $('#capture-frame-button').hidden = true;
-    return;
-  }
-  if (!navigator.mediaDevices?.getUserMedia) {
-    notify('Webcam requires HTTPS or localhost and a supported browser.');
-    return;
-  }
-  try {
-    state.cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    video.srcObject = state.cameraStream;
-    video.hidden = false;
-    $('.camera-placeholder').hidden = true;
-    button.textContent = 'Stop webcam';
-    $('#capture-frame-button').hidden = false;
-    $('#media-result').textContent = 'Webcam preview is local to this browser. No analysis occurs until a frame is captured.';
-  } catch {
-    notify('Camera permission was not granted or the camera is unavailable.');
-  }
-}
-
-async function captureWebcamFrame() {
-  const video = $('#camera-video');
-  if (!video.videoWidth) {
-    notify('Camera is still starting. Try again in a moment.');
-    return;
-  }
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  canvas.toBlob((blob) => {
-    if (blob) inspectUpload(new File([blob], 'webcam-frame.jpg', { type: 'image/jpeg' }));
-  }, 'image/jpeg');
-}
-
-function exportReport() {
-  const report = {
-    generated_at: new Date().toISOString(),
-    mode: 'DEMO DATA MODE',
-    note: 'Synthetic configuration and workflow examples only. No verified live observations.',
-    zones: state.zones,
-    events: state.events,
-    satellite_observations: null,
-    live_risk_assessment: null,
-  };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'greenguard-demo-report.json';
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  initMap();
-  updateClock();
-  window.setInterval(updateClock, 30000);
-  loadDashboard();
-  $('#mobile-menu').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
-  document.querySelectorAll('.main-nav a').forEach((link) => link.addEventListener('click', () => $('#sidebar').classList.remove('open')));
-  $('#theme-toggle').addEventListener('click', () => document.documentElement.classList.toggle('light-mode'));
-  $('#banner-close').addEventListener('click', () => $('.demo-banner').remove());
-  $('#start-demo-button').addEventListener('click', startDemo);
-  $('#demo-zone').addEventListener('change', loadWeather);
-  $('#trigger-demo-button').addEventListener('click', async () => {
-    const category = $('#demo-starting-scenario').value;
-    try {
-      await emitDemoEvent(category);
-    } catch (error) {
-      notify(`Could not create sample event: ${error.message}`);
-    }
-  });
-  $('#add-zone-button').addEventListener('click', () => {
-    if (!state.map) {
-      notify('The map is unavailable. Connect to the internet and reload.');
-      return;
-    }
-    if (!state.selectedPoint) {
-      const center = state.map.getCenter();
-      $('#zone-lat').value = center.lat.toFixed(6);
-      $('#zone-lng').value = center.lng.toFixed(6);
-    }
-    $('#zone-error').textContent = '';
-    $('#zone-dialog').showModal();
-  });
-  $('#cancel-zone').addEventListener('click', () => $('#zone-dialog').close());
-  $('#close-dialog').addEventListener('click', (event) => { event.preventDefault(); $('#zone-dialog').close(); });
-  $('#zone-form').addEventListener('submit', saveZone);
-  $('#add-point-button').addEventListener('click', () => {
-    if (!state.map) {
-      notify('The map is unavailable. Connect to the internet and reload.');
-      return;
-    }
-    const point = state.selectedPoint || state.map.getCenter();
-    $('#point-lat').value = point.lat.toFixed(6);
-    $('#point-lng').value = point.lng.toFixed(6);
-    $('#point-error').textContent = '';
-    renderPointZones();
-    if (!state.zones.length) {
-      notify('Create a monitoring zone before adding a point.');
-      return;
-    }
-    $('#point-dialog').showModal();
-  });
-  $('#cancel-point').addEventListener('click', () => $('#point-dialog').close());
-  $('#close-point-dialog').addEventListener('click', (event) => { event.preventDefault(); $('#point-dialog').close(); });
-  $('#point-form').addEventListener('submit', savePoint);
-  $('#point-kind').addEventListener('change', updatePointTypeHelp);
-  $('#geojson-upload').addEventListener('change', async (event) => {
-    state.uploadedBoundary = null;
-    const file = event.target.files[0];
-    if (!file) return;
-    try {
-      if (file.size > 5 * 1024 * 1024) throw new Error('GeoJSON boundary must be 5 MB or smaller.');
-      const parsed = JSON.parse(await file.text());
-      const geometry = parsed.type === 'Feature' ? parsed.geometry : parsed;
-      if (!geometry || !['Polygon', 'MultiPolygon'].includes(geometry.type) ||
-          !Array.isArray(geometry.coordinates) || !geometry.coordinates.length) {
-        throw new Error('Choose a GeoJSON Polygon or MultiPolygon.');
+      if (sendAt.has(state.demoRemaining)) {
+        state.demoIndex = (state.demoIndex + 1) % demoSequence.length;
+        try { await emitDemoEvent(demoSequence[state.demoIndex]); }
+        catch (error) { stopDemo(false, true); notify(`Demo paused: ${error.message}`); return; }
       }
-      state.uploadedBoundary = geometry;
-      $('#zone-error').textContent = 'Boundary loaded. Select its center on the map or enter coordinates.';
+      setDemoStatus(`Simulation running · 00:${String(state.demoRemaining).padStart(2, '0')} · synthetic only`, true);
+    }, 1000);
+  }
+
+  function playDemoTone() {
+    try {
+      const AudioContextType = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextType) return;
+      state.audioContext ||= new AudioContextType();
+      if (state.audioContext.state === 'suspended') state.audioContext.resume();
+      const oscillator = state.audioContext.createOscillator();
+      const gain = state.audioContext.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(740, state.audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(590, state.audioContext.currentTime + .13);
+      gain.gain.setValueAtTime(.07, state.audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.001, state.audioContext.currentTime + .27);
+      oscillator.connect(gain).connect(state.audioContext.destination);
+      oscillator.start();
+      oscillator.stop(state.audioContext.currentTime + .28);
     } catch (error) {
-      $('#zone-error').textContent = error.message || 'Could not read this GeoJSON file.';
-      event.target.value = '';
+      notify(`Demo tone unavailable: ${error.message}`);
     }
-  });
-  $('#zone-dialog').addEventListener('close', () => {
-    state.uploadedBoundary = null;
-    $('#geojson-upload').value = '';
-  });
-  $('#event-filter').addEventListener('change', renderEvents);
-  $('#event-list').addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-event]');
-    if (button) changeEventStatus(button.dataset.event, button.dataset.status);
-  });
-  $('#search-button').addEventListener('click', searchLocation);
-  $('#location-search').addEventListener('keydown', (event) => { if (event.key === 'Enter') searchLocation(); });
-  $('#media-upload').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const image = $('#image-preview');
+  }
+
+  function setDemoSound() {
+    state.soundEnabled = !state.soundEnabled;
+    $('#sound-toggle').setAttribute('aria-pressed', String(state.soundEnabled));
+    $('b', $('#sound-toggle')).textContent = state.soundEnabled ? 'Sound on' : 'Sound off';
+    $('small', $('#sound-toggle')).textContent = state.soundEnabled ? 'Synthetic demo tone' : 'Demo tone only';
+    if (state.soundEnabled) playDemoTone();
+  }
+
+  function makeBoundary(lat, lng) {
+    const latOffset = .035, lngOffset = .045;
+    return { type: 'Polygon', coordinates: [[[lng - lngOffset, lat - latOffset], [lng + lngOffset, lat - latOffset], [lng + lngOffset, lat + latOffset], [lng - lngOffset, lat + latOffset], [lng - lngOffset, lat - latOffset]]] };
+  }
+
+  async function saveZone(event) {
+    event.preventDefault();
+    $('#zone-error').textContent = '';
+    try {
+      await api('/api/zones', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: $('#zone-name').value.trim(), latitude: Number($('#zone-lat').value),
+          longitude: Number($('#zone-lng').value),
+          boundary: state.uploadedBoundary || makeBoundary(Number($('#zone-lat').value), Number($('#zone-lng').value)),
+        }),
+      });
+      $('#zone-dialog').close();
+      $('#zone-form').reset();
+      await loadDashboard();
+      notify('Illustrative monitoring zone saved.');
+    } catch (error) {
+      $('#zone-error').textContent = error.message;
+    }
+  }
+
+  async function savePoint(event) {
+    event.preventDefault();
+    $('#point-error').textContent = '';
+    try {
+      await api('/api/points', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zone_id: $('#point-zone').value, name: $('#point-name').value.trim(), kind: $('#point-kind').value,
+          latitude: Number($('#point-lat').value), longitude: Number($('#point-lng').value),
+        }),
+      });
+      $('#point-dialog').close();
+      $('#point-form').reset();
+      await loadDashboard();
+      notify('Device marker saved; no sensor is connected.');
+    } catch (error) {
+      $('#point-error').textContent = error.message;
+    }
+  }
+
+  async function searchLocation() {
+    const query = $('#location-search').value.trim();
+    if (!query) return;
+    if (!state.map) { notify('The map is unavailable. Check your internet connection.'); return; }
+    if (query.toLowerCase().includes('aravalli')) {
+      state.map.setView([ARAVALLI.latitude, ARAVALLI.longitude], 10);
+      return;
+    }
+    const button = $('#search-button');
+    button.disabled = true;
+    button.textContent = '…';
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`);
+      if (!response.ok) throw new Error(`Search service returned ${response.status}.`);
+      const results = await response.json();
+      if (!results.length) { notify('No matching location found.'); return; }
+      state.map.setView([Number(results[0].lat), Number(results[0].lon)], 11);
+      notify('Location found. Click the map to select coordinates.');
+    } catch (error) {
+      notify(`Location search unavailable: ${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Search';
+    }
+  }
+
+  function setReportResult(message, error = false) {
+    const result = $('#report-result');
+    result.textContent = message;
+    result.dataset.state = error ? 'error' : 'success';
+  }
+
+  async function submitReport(event) {
+    event.preventDefault();
+    const report = {
+      observation_type: $('#report-type').value,
+      observed_at: new Date($('#report-time').value).toISOString(),
+      latitude: Number($('#report-lat').value),
+      longitude: Number($('#report-lng').value),
+      place: $('#report-place').value.trim(),
+      description: $('#report-description').value.trim(),
+      contact_email: $('#report-contact').value.trim() || null,
+    };
+    try {
+      const saved = await api('/api/reports', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
+      });
+      const authorityEmail = $('#authority-email').value.trim();
+      setReportResult(`Report ${saved.id} saved in ${saved.storage}. It has NOT been transmitted; no authority is notified.`);
+      if (authorityEmail && window.confirm('This only opens your email app with a draft. GreenGuard will not send it. Continue?')) {
+        const subject = encodeURIComponent(`Environmental observation report · ${report.place}`);
+        const body = encodeURIComponent([
+          'Personal observation (not independently verified)',
+          `Type: ${report.observation_type}`,
+          `Observed at: ${report.observed_at}`,
+          `Approximate coordinates: ${report.latitude}, ${report.longitude}`,
+          `Nearby place: ${report.place}`,
+          `Description: ${report.description}`,
+          report.contact_email ? `Contact email: ${report.contact_email}` : '',
+          '',
+          'Prepared with the GreenGuard independent prototype. Please verify this information through official channels.',
+        ].filter(Boolean).join('\n'));
+        window.location.href = `mailto:${encodeURIComponent(authorityEmail)}?subject=${subject}&body=${body}`;
+        setReportResult(`Report ${saved.id} saved. An email draft was opened for your review; it was not sent.`);
+      }
+      $('#report-form').reset();
+      setDefaultReportTime();
+    } catch (error) {
+      setReportResult(`Report was not saved: ${error.message}`, true);
+    }
+  }
+
+  function setDefaultReportTime() {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    $('#report-time').value = now.toISOString().slice(0, 16);
+  }
+
+  async function inspectMedia(file) {
+    const result = $('#media-result');
+    result.textContent = 'Checking selected media… no activity detection is configured.';
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const inspection = await api('/api/media/analyze', { method: 'POST', body: form });
+      const dimensions = inspection.dimensions ? ` ${inspection.dimensions[0]} × ${inspection.dimensions[1]} px.` : '';
+      result.textContent = `${inspection.message}${dimensions} This media was not saved.`;
+    } catch (error) {
+      result.textContent = `Media check failed: ${error.message}`;
+    }
+  }
+
+  async function toggleWebcam() {
     const video = $('#camera-video');
+    const button = $('#webcam-button');
     if (state.cameraStream) {
       state.cameraStream.getTracks().forEach((track) => track.stop());
       state.cameraStream = null;
-      $('#webcam-button').textContent = 'Start webcam';
-      $('#capture-frame-button').hidden = true;
-    }
-    if (file.type.startsWith('image/')) {
-      image.src = URL.createObjectURL(file);
-      image.hidden = false;
-      video.hidden = true;
-      $('.camera-placeholder').hidden = true;
-    } else {
-      image.hidden = true;
-      const previewUrl = URL.createObjectURL(file);
       video.srcObject = null;
-      video.src = previewUrl;
-      video.controls = true;
-      video.hidden = false;
-      $('.camera-placeholder').hidden = true;
+      video.hidden = true;
+      $('#camera-placeholder').hidden = false;
+      $('#capture-frame-button').hidden = true;
+      button.textContent = '◎ Start my camera';
+      return;
     }
-    inspectUpload(file);
-    event.target.value = '';
+    if (!navigator.mediaDevices?.getUserMedia) {
+      notify('Camera preview requires HTTPS or localhost and a supported browser.');
+      return;
+    }
+    try {
+      state.cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      video.srcObject = state.cameraStream;
+      video.hidden = false;
+      $('#camera-placeholder').hidden = true;
+      $('#capture-frame-button').hidden = false;
+      button.textContent = 'Stop my camera';
+      $('#media-result').textContent = 'Private preview in this browser only. No field feed or analysis is connected.';
+    } catch (error) {
+      notify(`Camera permission unavailable: ${error.message}`);
+    }
+  }
+
+  function captureCameraFrame() {
+    const video = $('#camera-video');
+    if (!video.videoWidth) { notify('Camera is still starting. Try again shortly.'); return; }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) { notify('Could not capture a local camera frame.'); return; }
+    context.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (blob) inspectMedia(new File([blob], 'local-camera-frame.jpg', { type: 'image/jpeg' }));
+      else notify('Could not create a local camera frame.');
+    }, 'image/jpeg');
+  }
+
+  async function exportReports() {
+    try {
+      const reports = await api('/api/reports');
+      const payload = {
+        generated_at: new Date().toISOString(),
+        note: 'User-submitted observations are unverified. No authority transmission is represented.',
+        reports,
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'greenguard-saved-reports.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setReportResult(`Could not export reports: ${error.message}`, true);
+    }
+  }
+
+  function wire() {
+    $$('[data-screen]').forEach((button) => button.addEventListener('click', () => {
+      showScreen(button.dataset.screen);
+      $('#sidebar').classList.remove('is-open');
+    }));
+    $('#enter-landscape').addEventListener('click', () => showScreen('landscape'));
+    $('#enter-watch').addEventListener('click', () => showScreen('guardian'));
+    $$('[data-story]').forEach((button) => button.addEventListener('click', () => openStory(button.dataset.story)));
+    $('#story-close').addEventListener('click', () => $('#story-dialog').close());
+    $('#story-next').addEventListener('click', () => openStory($('#story-next').dataset.story));
+    $('#film-prev').addEventListener('click', () => setFilm(state.filmIndex - 1));
+    $('#film-next').addEventListener('click', () => setFilm(state.filmIndex + 1));
+    $$('#film-dots button').forEach((button, index) => button.addEventListener('click', () => setFilm(index)));
+    $('#film-play').addEventListener('click', toggleFilm);
+    $('#mobile-menu').addEventListener('click', () => $('#sidebar').classList.toggle('is-open'));
+    $$('[data-scroll]').forEach((button) => button.addEventListener('click', () => {
+      document.getElementById(button.dataset.scroll).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $$('.rail-nav button').forEach((item) => item.classList.toggle('active', item === button));
+      $('#sidebar').classList.remove('is-open');
+    }));
+    $('#toast-close').addEventListener('click', () => { $('#alert-toast').hidden = true; });
+    $('#map-layer-toggle').addEventListener('click', () => {
+      const controls = $('.leaflet-control-layers');
+      if (controls) controls.classList.toggle('leaflet-control-layers-expanded');
+      else notify('Map layers unavailable while the map library is disconnected.');
+    });
+    $('#location-button').addEventListener('click', () => {
+      if (!navigator.geolocation) { notify('This browser does not provide location access.'); return; }
+      navigator.geolocation.getCurrentPosition((position) => state.map?.setView([position.coords.latitude, position.coords.longitude], 13),
+        () => notify('Location permission was not granted or location is unavailable.'), { timeout: 8000 });
+    });
+    $('#add-zone-button').addEventListener('click', () => {
+      if (!state.map) { notify('Map is unavailable.'); return; }
+      const point = state.selectedPoint || state.map.getCenter();
+      $('#zone-lat').value = point.lat.toFixed(6);
+      $('#zone-lng').value = point.lng.toFixed(6);
+      $('#zone-error').textContent = '';
+      $('#zone-dialog').showModal();
+    });
+    $('#add-point-button').addEventListener('click', () => {
+      if (!state.map) { notify('Map is unavailable.'); return; }
+      if (!state.zones.length) { notify('Create a zone before adding a monitoring point.'); return; }
+      const point = state.selectedPoint || state.map.getCenter();
+      $('#point-lat').value = point.lat.toFixed(6);
+      $('#point-lng').value = point.lng.toFixed(6);
+      $('#point-error').textContent = '';
+      $('#point-form').reset();
+      renderPointZones();
+      $('#point-lat').value = point.lat.toFixed(6);
+      $('#point-lng').value = point.lng.toFixed(6);
+      $('#point-dialog').showModal();
+    });
+    $('#close-zone').addEventListener('click', () => $('#zone-dialog').close());
+    $('#close-point').addEventListener('click', () => $('#point-dialog').close());
+    $('#zone-form').addEventListener('submit', saveZone);
+    $('#point-form').addEventListener('submit', savePoint);
+    $('#geojson-upload').addEventListener('change', async (event) => {
+      state.uploadedBoundary = null;
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        if (file.size > 5 * 1024 * 1024) throw new Error('GeoJSON must be 5 MB or smaller.');
+        const parsed = JSON.parse(await file.text());
+        const geometry = parsed.type === 'Feature' ? parsed.geometry : parsed;
+        if (!geometry || !['Polygon', 'MultiPolygon'].includes(geometry.type) || !Array.isArray(geometry.coordinates)) throw new Error('Choose a GeoJSON Polygon or MultiPolygon.');
+        state.uploadedBoundary = geometry;
+        $('#zone-error').textContent = 'Boundary loaded. Check coordinate accuracy and permissions before use.';
+      } catch (error) {
+        $('#zone-error').textContent = error.message;
+        event.target.value = '';
+      }
+    });
+    $('#event-filter').addEventListener('change', renderEvents);
+    $('#event-list').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-event]');
+      if (button) changeEventStatus(button.dataset.event, button.dataset.status);
+    });
+    $('#demo-starting-scenario').addEventListener('change', () => { state.demoIndex = demoSequence.indexOf($('#demo-starting-scenario').value); });
+    $('#trigger-demo-button').addEventListener('click', () => emitDemoEvent($('#demo-starting-scenario').value).catch((error) => notify(`Could not create sample event: ${error.message}`)));
+    $('#start-demo-button').addEventListener('click', startDemo);
+    $('#sound-toggle').addEventListener('click', setDemoSound);
+    $('#webcam-button').addEventListener('click', toggleWebcam);
+    $('#capture-frame-button').addEventListener('click', captureCameraFrame);
+    $('#media-upload').addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (state.cameraStream) {
+        state.cameraStream.getTracks().forEach((track) => track.stop());
+        state.cameraStream = null;
+        $('#camera-video').srcObject = null;
+        $('#camera-video').hidden = true;
+        $('#capture-frame-button').hidden = true;
+        $('#webcam-button').textContent = '◎ Start my camera';
+      }
+      const previewUrl = URL.createObjectURL(file);
+      if (file.type.startsWith('image/')) {
+        const image = $('#image-preview');
+        const oldUrl = image.dataset.objectUrl;
+        if (oldUrl) URL.revokeObjectURL(oldUrl);
+        image.dataset.objectUrl = previewUrl;
+        image.src = previewUrl;
+        image.hidden = false;
+        $('#camera-video').hidden = true;
+      } else if (file.type.startsWith('video/')) {
+        $('#image-preview').hidden = true;
+        const video = $('#camera-video');
+        video.srcObject = null;
+        video.src = previewUrl;
+        video.controls = true;
+        video.muted = true;
+        video.hidden = false;
+      }
+      $('#camera-placeholder').hidden = true;
+      inspectMedia(file);
+      event.target.value = '';
+    });
+    $('#search-button').addEventListener('click', searchLocation);
+    $('#location-search').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); searchLocation(); } });
+    $('#report-form').addEventListener('submit', submitReport);
+    $('#export-reports').addEventListener('click', exportReports);
+    window.addEventListener('pagehide', () => {
+      if (state.cameraStream) state.cameraStream.getTracks().forEach((track) => track.stop());
+      if (state.filmTimer) clearInterval(state.filmTimer);
+      if (state.demoTimer) clearInterval(state.demoTimer);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    wire();
+    updateClock();
+    setDefaultReportTime();
+    window.setInterval(updateClock, 30000);
+    window.setInterval(() => { if (state.currentScreen === 'guardian') loadWeather(); }, 5 * 60 * 1000);
+    loadDashboard();
   });
-  $('#webcam-button').addEventListener('click', startWebcam);
-  $('#capture-frame-button').addEventListener('click', captureWebcamFrame);
-  $('#export-report').addEventListener('click', exportReport);
-  $('#location-search').value = 'Aravalli Hills — illustrative demo region';
-  window.setInterval(loadWeather, 5 * 60 * 1000);
-});
+})();

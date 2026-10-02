@@ -1,299 +1,165 @@
+# GreenGuard AI
 
+**Eyes in the Sky. Eyes on the Ground.**  
+An independent environmental-monitoring prototype and seminar experience.
 
-Project Name: GreenGuard AI
-Tagline: “Eyes in the Sky. Eyes on the Ground.”
+[![Live demo](https://img.shields.io/badge/Live%20demo-GitHub%20Pages-2f6b43)](https://shivnandan225.github.io/github-copilot-seminar/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)](https://fastapi.tiangolo.com/)
+[![Maps](https://img.shields.io/badge/Maps-Leaflet-199900)](https://leafletjs.com/)
 
-Live Demo:
-https://shivnandan225.github.io/github-copilot-seminar/
+GreenGuard presents a three-part journey: arrive in an Aravalli landscape, learn about its ecological context, then explore a map-led monitoring and human-review prototype.
 
+**[Open the live demo](https://shivnandan225.github.io/github-copilot-seminar/)** · [View the repository](https://github.com/shivnandan225/github-copilot-seminar)
 
-Opening Section
+> The selectable starting pin is an approximate location near Udaipur, Rajasthan. Its map boundary and device locations are illustrative—not an official forest boundary. The Aravalli range is in north-western India, not Madhya Pradesh.
 
-Start with a visually attractive hero section containing:
+## The experience
 
-- GreenGuard AI title
-- Tagline
-- Short one-line description
-- Live Demo button/link
-- GitHub Repository button/link
-- Technology badges
+1. **Arrive:** a nature-inspired welcome and credited Aravalli photographs.
+2. **Understand:** short stories about wildlife, water, communities, and landscape change.
+3. **Stand watch:** an interactive map, regional weather-model context, local camera preview, synthetic alert walkthrough, human review queue, and observation-report form.
 
-Use clean GitHub-compatible Markdown and avoid excessive decoration.
+The prototype demonstrates a possible monitoring workflow, not a deployed forest surveillance system. It does not identify people or determine that a crime occurred.
 
-Problem Statement
+## What works today
 
-Explain that forests are difficult to continuously monitor because of:
+| Feature | Current behavior |
+| --- | --- |
+| Interactive geospatial map | Leaflet street and imagery basemaps; illustrative zones, device placeholders, and demo event markers |
+| Zone and point registration | Create map zones, load a GeoJSON boundary, and register camera/acoustic/location placeholders |
+| Regional weather | Current Open-Meteo model conditions near the selected demo zone; not a forest sensor reading |
+| Camera preview | Optional permissioned camera from the visitor's own device, or image/video preview; media is not saved |
+| Media inspection | Basic file readability checks only; no object-detection model is configured |
+| Demonstration alerts | One-click sample and timed synthetic scenarios for camera, acoustic, and satellite-review workflows |
+| Human review | Mark a sample event reviewed, dismiss it, or reopen it |
+| Observation reports | Save locally and export reports; reports are not sent to authorities |
+| GitHub Pages demo | Browser-local demonstration API backed by that browser's local storage |
+| Local API | FastAPI and SQLite routes for zones, points, reviews, reports, weather, and media inspection |
 
-- Large geographical areas
-- Illegal or unauthorized human activity
-- Forest fires and smoke
-- Vegetation disturbance
-- Remote locations
-- Limited continuous ground-level monitoring
-- Delayed human response
+Satellite imagery is an optional map basemap with provider-dependent capture dates—not live satellite video or change detection. A Forest Fusion Engine, risk heatmap, real-time field cameras, acoustic analysis, fire/smoke model, and verified satellite observations are **future concepts**, not currently connected features.
 
-Clearly explain that traditional monitoring alone cannot provide continuous situational awareness.
+## Why a human stays in the loop
 
-Our Solution
+Automated monitoring can be noisy, incomplete, or wrong. Alerts are prompts for careful review—not evidence, accusations, or proof of illegal activity. Any AI-generated event must use the wording:
 
-Explain GreenGuard AI as a multi-source environmental monitoring prototype combining:
+> **Potential activity detected — human verification required.**
 
-Satellite + Ground Cameras + Environmental Data + AI Analysis + Human Verification
+The user-submitted report form collects personal observations but does not transmit them. If an email address is independently verified and provided, the site can open a draft for the user to inspect; it never sends the message. GreenGuard is not a government service, has no official partnership, and has no officer-notification channel.
 
-The system should detect or flag potential environmental events and provide a centralized map-based monitoring interface.
+## Demo and data transparency
 
-Important: Never claim that the system automatically proves illegal activity or identifies criminals.
+The application starts in **DEMO DATA MODE**. There are no configured live forest cameras, acoustic sensors, satellite-change observations, computer-vision model, official forest boundary, or authority reporting channel.
 
-Use the wording:
+- Zone outlines, sensor markers, sample alerts, and review events are illustrative or synthetic—not verified incidents or observations.
+- The 60-second walkthrough creates synthetic events; it makes no real-world detections.
+- The alert tone is browser-generated, opt-in, and demonstration-only.
+- Local webcam use requires the visitor's permission. It is not an Aravalli field camera.
+- Uploaded media is inspected for basic readability only and is not saved or analyzed by an object detector.
+- Weather is a regional model estimate. Map imagery is geographic context, not proof of current conditions.
+- Wildlife examples are associated with parts of the broader Aravalli region; they do not confirm sightings at the demo pin.
+- Automated change detection can produce false positives and requires verification.
 
-«“Potential activity detected — human verification required.”»
+## System workflow
 
-What Makes GreenGuard Different
+```mermaid
+flowchart LR
+    A[Map and illustrative zones] --> B[Regional weather context]
+    A --> C[User-selected media or local camera]
+    C --> D[Basic readability check]
+    E[Synthetic demo scenario] --> F[Potential activity detected — human verification required]
+    D --> G[No model configured]
+    G --> H[Human review queue]
+    F --> H
+    H --> I[Reviewed or dismissed]
+    J[Personal observation form] --> K[Saved locally; not transmitted]
+```
 
-Create a dedicated section called:
+## Architecture
 
-🌍 Why GreenGuard AI?
+| Layer | Implementation |
+| --- | --- |
+| Frontend | HTML5, CSS3, JavaScript, responsive layout |
+| Mapping | Leaflet with OpenStreetMap and Esri imagery basemaps |
+| Local backend | Python, FastAPI, SQLite |
+| Media interface | Replaceable detector interface; current provider is unconfigured |
+| Static deployment | GitHub Pages with a browser-local API adapter |
 
-Highlight these differentiating concepts:
+GitHub Pages serves static files only; it cannot run FastAPI or SQLite. On Pages, zones, points, review states, and reports live in the visitor's browser local storage. The local FastAPI version stores application data in SQLite. The two modes do not share a database.
 
-1. Eyes in the Sky
-   Map and optional satellite imagery provide a large-area environmental view.
+## Run locally
 
-2. Eyes on the Ground
-   Ground monitoring points and camera inputs provide localized monitoring.
+Requires Python 3.10+.
 
-3. Forest Fusion Engine
-   Combine multiple signals instead of relying on a single source.
-
-4. Risk Heatmap
-   Visualize areas requiring attention.
-
-5. Human Verification Center
-   AI-generated alerts are reviewed by humans before being treated as incidents.
-
-6. Explainable Monitoring
-   Show why an area or event received attention.
-
-7. Fire & Smoke Awareness
-   Support early warning workflows for potential fire/smoke events.
-
-8. Biodiversity Watch
-   Provide a future-ready structure for monitoring wildlife and ecological changes.
-
-9. Acoustic Forest Guardian
-   Include configurable acoustic-sensor concepts for detecting unusual environmental sounds such as machinery or chainsaw-like patterns.
-
-10. Offline / Edge-Ready Architecture
-    Design the system so future camera/sensor processing can work closer to the monitoring location.
-
-Current Prototype Architecture
-
-Clearly explain the actual current implementation:
-
-Frontend:
-
-- HTML
-- CSS
-- JavaScript
-- Leaflet.js
-- Interactive maps
-- Browser-local demo API
-
-Backend:
-
-- FastAPI
-- Python
-- SQLite
-
-Deployment:
-
-- GitHub Pages for the static frontend
-- Local FastAPI backend for the full prototype
-
-Also explain that GitHub Pages cannot execute FastAPI or SQLite directly.
-
-Important Demo Transparency
-
-Create a highly visible section:
-
-⚠️ Demo & Data Transparency
-
-Explain that the current application starts in DEMO DATA MODE.
-
-The following are synthetic/demo elements:
-
-- Illustrative forest boundary
-- Monitoring devices
-- Risk zones
-- Timeline events
-- Sample alerts
-- Camera/acoustic review events
-
-Clearly state that these are not verified real-world incidents or satellite observations.
-
-Explain that the architecture is designed so verified live providers can be integrated later.
-
-Technical Features
-
-Create a clean feature table with:
-
-Feature| Purpose
-Interactive Map| Visualize monitored areas
-Monitoring Zones| Define areas of interest
-Camera Monitoring| Review ground-level media
-Risk Heatmap| Identify areas requiring attention
-Alert System| Surface potential events
-Human Verification| Validate AI-generated events
-Weather Information| Provide contextual weather information
-Timeline| Track monitoring events
-SQLite| Store prototype application data
-FastAPI| Backend API
-Leaflet| Interactive geospatial interface
-
-System Workflow
-
-Create a simple Mermaid diagram if GitHub rendering supports it:
-
-User
-↓
-Interactive Map
-↓
-Monitoring Zones
-↓
-Satellite / Camera / Environmental Inputs
-↓
-AI & Rule-Based Analysis
-↓
-Forest Fusion Engine
-↓
-Risk Assessment
-↓
-Human Verification
-↓
-Alert / Timeline / Evidence
-
-Make it clear that the final verification step prevents the system from treating automated analysis as confirmed incidents.
-
-GitHub Pages
-
-Add a section explaining:
-
-The frontend is deployed through GitHub Pages.
-
-Live Demo:
-
-https://shivnandan225.github.io/github-copilot-seminar/
-
-Explain that the GitHub Pages version runs a browser-local demonstration because GitHub Pages is static hosting.
-
-Local Setup
-
-Include the exact setup:
-
+```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
+```
 
-Then explain how to open the local FastAPI application.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Internet access is needed for map tiles, Leaflet, landscape photographs, geocoding, and regional weather. Webcam access requires HTTPS or localhost and the visitor's permission.
 
-Project Structure
+Set `GREEN_GUARD_DB` to a file path to use a different SQLite database from `data/greenguard.db`. Interactive API documentation is available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
-Create a clean project-tree section showing the important folders/files.
+### API
 
-Do not invent files that are not present in the repository. Inspect the repository structure first and document the actual files.
+- `GET /api/overview`, `/api/zones`, `/api/points`, `/api/events`, `/api/reports`, `/api/system`
+- `GET /api/weather?latitude=24.58&longitude=73.68` — regional Open-Meteo weather-model conditions
+- `POST /api/zones` — create a zone with a GeoJSON Polygon or MultiPolygon
+- `POST /api/points` — register a monitoring point or device placeholder
+- `POST /api/demo/events` — create a synthetic event for the walkthrough
+- `PATCH /api/events/{event_id}` — update human-review status
+- `POST /api/reports` — save an unverified observation report; never transmits it
+- `POST /api/media/analyze` — inspect an image/video through the configured detector interface
 
-Future Roadmap
+### Project structure
 
-Create a professional roadmap containing:
+```text
+.
+├── .github/workflows/deploy-pages.yml
+├── app/
+│   ├── database.py
+│   ├── detector.py
+│   ├── main.py
+│   └── static/
+│       ├── app.js
+│       ├── index.html
+│       ├── static-demo.js
+│       └── styles.css
+├── requirements.txt
+└── README.md
+```
 
-- [ ] Verified satellite change-detection provider
-- [ ] Real-time camera streams
-- [ ] Production computer-vision model
-- [ ] Fire/smoke detection model
-- [ ] Acoustic event classification
-- [ ] Sensor/IoT integration
-- [ ] Mobile alert notifications
-- [ ] Advanced geospatial analytics
-- [ ] Edge AI deployment
-- [ ] Role-based authority dashboard
-- [ ] Production database
-- [ ] Verified environmental datasets
+## Future roadmap
 
-Clearly distinguish future features from currently implemented features.
+These are potential next steps; they are not live features:
 
-Responsible AI & Safety
+- [ ] Connect a verified satellite change-detection provider
+- [ ] Integrate authorized field-camera streams and a vetted vision model
+- [ ] Evaluate fire/smoke and acoustic event-classification models
+- [ ] Add consent-based sensor/IoT integration and edge processing
+- [ ] Build explainable, uncertainty-aware geospatial analytics
+- [ ] Add verified environmental datasets and local review processes
+- [ ] Provide role-based authority workflows and secure notifications
+- [ ] Migrate to a production database and define retention/privacy controls
+- [ ] Evaluate mobile and offline operation for authorized field teams
 
-Add a section explaining:
+## Credits and sources
 
-- AI alerts are not proof of crimes.
-- Human verification is required.
-- The prototype does not identify people.
-- Uploaded media is not permanently stored.
-- Demo data is clearly separated from real observations.
-- False positives are possible.
-- Verified data providers should be used before making real-world environmental claims.
+The landscape story uses still photographs from Wikimedia Commons; photographer, location, and license are linked beside each image. Map layers are credited in the map. Regional weather is provided by [Open-Meteo](https://open-meteo.com/). Wildlife and landscape descriptions are general context, not site-specific ecological claims.
 
-Technologies
+## Built with GitHub Copilot
 
-Add attractive badges for the technologies actually used:
+GitHub Copilot was used as an AI-assisted development partner for exploring architecture, iterating on frontend and API implementation, debugging, documentation, and deployment workflow work. The project and its technical decisions were directed and reviewed by its author.
 
-Python, FastAPI, SQLite, HTML5, CSS3, JavaScript, Leaflet, GitHub Pages.
+## The vision
 
-Do not add technologies that are not actually implemented.
+GreenGuard AI aims to demonstrate how geospatial interfaces, environmental context, carefully scoped analysis, and human verification might work together in future monitoring systems—once verified data providers, authorized sensors, privacy safeguards, and operational partners are in place.
 
-GitHub Copilot Contribution
+**Eyes in the Sky. Eyes on the Ground.**
 
-Since this project was developed as part of a GitHub Copilot seminar, add:
-
-🤖 Built with GitHub Copilot
-
-Explain that GitHub Copilot was used as an AI-assisted development partner for:
-
-- Project architecture exploration
-- Code generation
-- API development
-- Frontend development
-- Debugging
-- Documentation
-- Feature iteration
-- Deployment workflow development
-
-Do not claim that Copilot independently built the entire project.
-
-Final Section
-
-End with an attractive section:
-
-🌱 The Vision
-
-Explain that GreenGuard AI aims to demonstrate how modern web technologies, geospatial visualization, AI-assisted analysis, and human verification can work together to create scalable environmental-monitoring systems.
-
-End with:
-
-“Eyes in the Sky. Eyes on the Ground.”
-
-Then provide:
-
-- Live Demo
-- GitHub Repository
-- Author: Shivnandan
-- Project category: Environmental Monitoring / AI / Geospatial Technology
-
-README Quality Requirements
-
-Make the README:
-
-- Professional
-- Recruiter-friendly
-- Hackathon/seminar-ready
-- Easy to understand
-- Visually attractive
-- Well structured
-- Technically honest
-- Mobile-friendly in presentation
-- Free from exaggerated AI claims
-
-Use badges, tables, diagrams, screenshots/placeholders where appropriate, and clear headings.
-
-Most importantly, inspect the actual repository before describing implementation details. Never claim that a feature is live if it exists only as a concept or demo.
+- **Live demo:** [shivnandan225.github.io/github-copilot-seminar](https://shivnandan225.github.io/github-copilot-seminar/)
+- **Repository:** [github.com/shivnandan225/github-copilot-seminar](https://github.com/shivnandan225/github-copilot-seminar)
+- **Author:** Shivnandan
+- **Category:** Environmental monitoring · AI prototype · geospatial technology

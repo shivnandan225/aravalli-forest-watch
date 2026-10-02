@@ -10,12 +10,12 @@ DATABASE_PATH = Path(os.environ.get("GREEN_GUARD_DB", "data/greenguard.db"))
 DEMO_BOUNDARY = {
     "type": "Polygon",
     "coordinates": [[
-        [77.02, 23.39],
-        [77.48, 23.49],
-        [77.73, 23.26],
-        [77.51, 22.98],
-        [77.13, 23.03],
-        [77.02, 23.39],
+        [73.58, 24.64],
+        [73.75, 24.67],
+        [73.82, 24.56],
+        [73.74, 24.48],
+        [73.59, 24.50],
+        [73.58, 24.64],
     ]],
 }
 
@@ -67,6 +67,18 @@ def initialize_database():
                 longitude REAL NOT NULL,
                 status TEXT NOT NULL DEFAULT 'Demo placeholder'
             );
+            CREATE TABLE IF NOT EXISTS reports (
+                id TEXT PRIMARY KEY,
+                observation_type TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                place TEXT NOT NULL,
+                description TEXT NOT NULL,
+                contact_email TEXT,
+                created_at TEXT NOT NULL,
+                transmission_status TEXT NOT NULL DEFAULT 'Not transmitted'
+            );
         """)
         if db.execute("SELECT COUNT(*) FROM zones").fetchone()[0] == 0:
             db.execute(
@@ -76,8 +88,8 @@ def initialize_database():
                 (
                     "demo-aravalli",
                     "Aravalli Hills — illustrative demo region",
-                    23.24,
-                    77.36,
+                    24.58,
+                    73.68,
                     json.dumps(DEMO_BOUNDARY),
                     "Demo monitoring",
                     "demo",
@@ -95,20 +107,55 @@ def initialize_database():
                         "Potential activity detected — human verification required.",
                         "Synthetic dashboard example only. No camera feed or real-world activity is represented.",
                         "Review", "Pending review", "Demo camera · illustrative",
-                        now, 23.29, 77.29,
+                        now, 24.59, 73.66,
                     ),
                     (
                         "demo-event-2", "demo-aravalli", "Satellite",
                         "Change review example — no observation attached",
                         "Synthetic workflow example only. No satellite observation or change estimate is configured.",
                         "Info", "Pending review", "Demo workflow · illustrative",
-                        now, 23.18, 77.48,
+                        now, 24.57, 73.70,
                     ),
                 ],
             )
         demo_zone_exists = db.execute(
             "SELECT 1 FROM zones WHERE id = 'demo-aravalli'"
         ).fetchone()
+        legacy_zone = db.execute(
+            """SELECT latitude, longitude FROM zones
+               WHERE id = 'demo-aravalli' AND region_type = 'demo'"""
+        ).fetchone()
+        if legacy_zone and abs(legacy_zone["latitude"] - 23.24) < 0.01 and abs(legacy_zone["longitude"] - 77.36) < 0.01:
+            db.execute(
+                """UPDATE zones SET latitude = ?, longitude = ?, boundary_json = ?
+                   WHERE id = 'demo-aravalli'""",
+                (24.58, 73.68, json.dumps(DEMO_BOUNDARY)),
+            )
+            db.execute(
+                """UPDATE events SET latitude = ?, longitude = ?
+                   WHERE id = 'demo-event-1' AND zone_id = 'demo-aravalli'""",
+                (24.59, 73.66),
+            )
+            db.execute(
+                """UPDATE events SET latitude = ?, longitude = ?
+                   WHERE id = 'demo-event-2' AND zone_id = 'demo-aravalli'""",
+                (24.57, 73.70),
+            )
+            db.execute(
+                """UPDATE monitoring_points SET latitude = ?, longitude = ?
+                   WHERE id = 'demo-cam-1' AND zone_id = 'demo-aravalli'""",
+                (24.59, 73.66),
+            )
+            db.execute(
+                """UPDATE monitoring_points SET latitude = ?, longitude = ?
+                   WHERE id = 'demo-audio-1' AND zone_id = 'demo-aravalli'""",
+                (24.57, 73.70),
+            )
+            db.execute(
+                """UPDATE monitoring_points SET latitude = ?, longitude = ?
+                   WHERE id = 'demo-audio-2' AND zone_id = 'demo-aravalli'""",
+                (24.61, 73.72),
+            )
         if (
             demo_zone_exists
             and db.execute("SELECT COUNT(*) FROM monitoring_points").fetchone()[0] == 0
@@ -118,9 +165,9 @@ def initialize_database():
                    (id, zone_id, name, kind, latitude, longitude)
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 [
-                    ("demo-cam-1", "demo-aravalli", "Demo camera placeholder", "camera", 23.29, 77.29),
-                    ("demo-audio-1", "demo-aravalli", "Demo acoustic placeholder A", "acoustic", 23.18, 77.48),
-                    ("demo-audio-2", "demo-aravalli", "Demo acoustic placeholder B", "acoustic", 23.26, 77.57),
+                    ("demo-cam-1", "demo-aravalli", "Demo camera placeholder", "camera", 24.59, 73.66),
+                    ("demo-audio-1", "demo-aravalli", "Demo acoustic placeholder A", "acoustic", 24.57, 73.70),
+                    ("demo-audio-2", "demo-aravalli", "Demo acoustic placeholder B", "acoustic", 24.61, 73.72),
                 ],
             )
 
@@ -224,4 +271,37 @@ def update_event_status(event_id, status):
         if result.rowcount == 0:
             return None
         row = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+        return dict(row)
+
+
+def list_reports():
+    with connect() as db:
+        rows = db.execute(
+            """SELECT id, observation_type, observed_at, latitude, longitude,
+                      place, description, contact_email, created_at, transmission_status
+               FROM reports ORDER BY created_at DESC"""
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def create_report(report):
+    with connect() as db:
+        db.execute(
+            """INSERT INTO reports
+               (id, observation_type, observed_at, latitude, longitude, place,
+                description, contact_email, created_at, transmission_status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Not transmitted')""",
+            (
+                report["id"], report["observation_type"], report["observed_at"],
+                report["latitude"], report["longitude"], report["place"],
+                report["description"], report.get("contact_email"),
+                report["created_at"],
+            ),
+        )
+        row = db.execute(
+            """SELECT id, observation_type, observed_at, latitude, longitude,
+                      place, description, contact_email, created_at, transmission_status
+               FROM reports WHERE id = ?""",
+            (report["id"],),
+        ).fetchone()
         return dict(row)

@@ -1,11 +1,11 @@
 (() => {
   const storageKey = 'greenguard-pages-demo-v1';
-  const center = [23.24, 77.36];
+  const center = [24.58, 73.68];
   const boundary = {
     type: 'Polygon',
     coordinates: [[
-      [77.02, 23.39], [77.48, 23.49], [77.73, 23.26],
-      [77.51, 22.98], [77.13, 23.03], [77.02, 23.39],
+      [73.58, 24.64], [73.75, 24.67], [73.82, 24.56],
+      [73.74, 24.48], [73.59, 24.50], [73.58, 24.64],
     ]],
   };
 
@@ -22,9 +22,9 @@
         region_type: 'demo',
       }],
       points: [
-        { id: 'demo-cam-1', zone_id: 'demo-aravalli', name: 'Demo camera placeholder', kind: 'camera', latitude: 23.29, longitude: 77.29, status: 'Demo placeholder' },
-        { id: 'demo-audio-1', zone_id: 'demo-aravalli', name: 'Demo acoustic placeholder A', kind: 'acoustic', latitude: 23.18, longitude: 77.48, status: 'Demo placeholder' },
-        { id: 'demo-audio-2', zone_id: 'demo-aravalli', name: 'Demo acoustic placeholder B', kind: 'acoustic', latitude: 23.26, longitude: 77.57, status: 'Demo placeholder' },
+        { id: 'demo-cam-1', zone_id: 'demo-aravalli', name: 'Demo camera placeholder', kind: 'camera', latitude: 24.59, longitude: 73.66, status: 'Demo placeholder' },
+        { id: 'demo-audio-1', zone_id: 'demo-aravalli', name: 'Demo acoustic placeholder A', kind: 'acoustic', latitude: 24.57, longitude: 73.70, status: 'Demo placeholder' },
+        { id: 'demo-audio-2', zone_id: 'demo-aravalli', name: 'Demo acoustic placeholder B', kind: 'acoustic', latitude: 24.61, longitude: 73.72, status: 'Demo placeholder' },
       ],
       events: [
         {
@@ -32,14 +32,14 @@
           title: 'Potential activity detected — human verification required.',
           description: 'Synthetic dashboard example only. No camera feed or real-world activity is represented.',
           severity: 'Review', status: 'Pending review', source: 'Demo camera · illustrative',
-          timestamp: now, latitude: 23.29, longitude: 77.29,
+          timestamp: now, latitude: 24.59, longitude: 73.66,
         },
         {
           id: 'demo-event-2', zone_id: 'demo-aravalli', category: 'Satellite',
           title: 'Change review example — no observation attached',
           description: 'Synthetic workflow example only. No satellite observation or change estimate is configured.',
           severity: 'Info', status: 'Pending review', source: 'Demo workflow · illustrative',
-          timestamp: now, latitude: 23.18, longitude: 77.48,
+          timestamp: now, latitude: 24.57, longitude: 73.70,
         },
       ],
     };
@@ -49,6 +49,25 @@
     try {
       const stored = JSON.parse(localStorage.getItem(storageKey));
       if (stored && Array.isArray(stored.zones) && Array.isArray(stored.points) && Array.isArray(stored.events)) {
+        const legacyZone = stored.zones.find((zone) => zone.id === 'demo-aravalli' &&
+          Math.abs(zone.latitude - 23.24) < 0.01 && Math.abs(zone.longitude - 77.36) < 0.01);
+        if (legacyZone) {
+          legacyZone.latitude = center[0];
+          legacyZone.longitude = center[1];
+          legacyZone.boundary = boundary;
+          stored.points.forEach((point) => {
+            if (point.zone_id !== legacyZone.id) return;
+            if (point.id === 'demo-cam-1') [point.latitude, point.longitude] = [24.59, 73.66];
+            if (point.id === 'demo-audio-1') [point.latitude, point.longitude] = [24.57, 73.70];
+            if (point.id === 'demo-audio-2') [point.latitude, point.longitude] = [24.61, 73.72];
+          });
+          stored.events.forEach((event) => {
+            if (event.zone_id !== legacyZone.id) return;
+            if (event.id === 'demo-event-1') [event.latitude, event.longitude] = [24.59, 73.66];
+            if (event.id === 'demo-event-2') [event.latitude, event.longitude] = [24.57, 73.70];
+          });
+        }
+        if (!Array.isArray(stored.reports)) stored.reports = [];
         return stored;
       }
     } catch {
@@ -63,13 +82,6 @@
     localStorage.setItem(storageKey, JSON.stringify(data));
   }
 
-  function jsonResponse(value, status = 200) {
-    return new Response(JSON.stringify(value), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   function overview() {
     return {
       zone_count: data.zones.length,
@@ -79,6 +91,13 @@
       health: 'No verified live data',
       satellite_change: null,
     };
+  }
+
+  function jsonResponse(value, status = 200) {
+    return new Response(JSON.stringify(value), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   async function weather(url) {
@@ -169,6 +188,7 @@
         }))
         .sort((first, second) => second.timestamp.localeCompare(first.timestamp)));
     }
+    if (path === '/api/reports' && method === 'GET') return jsonResponse(data.reports || []);
     if (path === '/api/system' && method === 'GET') {
       return jsonResponse({
         status: 'online',
@@ -203,6 +223,24 @@
         ...saved,
         zone_name: data.zones.find((zone) => zone.id === saved.zone_id).name,
       }, 201);
+    }
+    if (path === '/api/reports' && method === 'POST') {
+      const input = await request.json();
+      if (!input.observation_type || !input.observed_at || !input.place || !input.description ||
+          !Number.isFinite(input.latitude) || !Number.isFinite(input.longitude) ||
+          input.latitude < -90 || input.latitude > 90 || input.longitude < -180 || input.longitude > 180) {
+        return jsonResponse({ detail: 'Provide an observation type, time, valid coordinates, place and description.' }, 422);
+      }
+      const report = {
+        id: `report-${crypto.randomUUID().slice(0, 10)}`,
+        ...input,
+        created_at: new Date().toISOString(),
+        transmission_status: 'Not transmitted',
+      };
+      data.reports = data.reports || [];
+      data.reports.unshift(report);
+      persist();
+      return jsonResponse({ ...report, storage: 'this browser' }, 201);
     }
     if (path === '/api/demo/events' && method === 'POST') {
       const input = await request.json();
@@ -255,7 +293,10 @@
 
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
-    const request = new Request(input, init);
+    const request = new Request(
+      input instanceof Request ? input : new URL(input, window.location.href),
+      init,
+    );
     const url = new URL(request.url, window.location.href);
     if (url.pathname.startsWith('/api/')) return routeApi(url.pathname, request);
     return originalFetch(input, init);
